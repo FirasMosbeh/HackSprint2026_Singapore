@@ -17,6 +17,8 @@ class CandidateStatus(str, Enum):
     queued = "queued"
     running = "running"
     passed = "passed"
+    # Fully evaluated, but one or more suites reported findings.
+    findings = "findings"
     failed = "failed"
     error = "error"
 

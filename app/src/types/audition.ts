@@ -11,6 +11,8 @@ export type CandidateStatus =
   | "queued"
   | "running"
   | "passed"
+  /** Fully evaluated, but the suites reported findings. */
+  | "findings"
   | "failed"
   | "error";
 
@@ -147,6 +149,7 @@ export interface AuditionRequest {
 
 export const TERMINAL_CANDIDATE_STATUSES: CandidateStatus[] = [
   "passed",
+  "findings",
   "failed",
   "error",
 ];

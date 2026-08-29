@@ -103,42 +103,35 @@ def _estimate_metrics(sandbox, runtime_seconds: float, stdout: str, stderr: str)
         "stderr_bytes": len(stderr.encode("utf-8", errors="replace")),
     }
 
-    try:
-        import psutil  # type: ignore
-
-        proc = psutil.Process()
-        mem = proc.memory_info().rss / (1024 * 1024)
-        children = proc.children(recursive=True)
-        disk = _directory_size_mb(getattr(sandbox, "repo_path", None))
-        cpu = proc.cpu_percent(interval=0.0)
-        metrics.update(
-            {
-                "peak_memory_mb": round(mem, 2),
-                "process_count": len(children) + 1,
-                "disk_usage_mb": round(disk, 2) if disk is not None else None,
-                "cpu_percent": cpu,
-            }
-        )
-        return metrics
-    except Exception:
-        pass
-
+    # Measure the *subject* process, not ourselves. The target runs as a
+    # reaped child, so RUSAGE_CHILDREN carries its peak RSS; RUSAGE_SELF would
+    # just report the harness and read identically for every candidate.
     try:
         import resource  # type: ignore
 
-        usage = resource.getrusage(resource.RUSAGE_SELF)
+        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
         peak = usage.ru_maxrss
         # ru_maxrss is bytes on macOS/BSD and kilobytes on Linux.
         peak_mb = peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
-        metrics["peak_memory_mb"] = round(peak_mb, 2)
+        metrics["peak_memory_mb"] = round(peak_mb, 2) if peak_mb > 0 else None
+        metrics["cpu_percent"] = round(
+            (usage.ru_utime + usage.ru_stime) / runtime_seconds * 100, 1
+        ) if runtime_seconds else None
     except Exception:
         metrics["peak_memory_mb"] = None
+        metrics["cpu_percent"] = None
 
-    metrics["process_count"] = None
+    try:
+        import psutil  # type: ignore
+
+        metrics["process_count"] = len(psutil.Process().children(recursive=True)) + 1
+    except Exception:
+        metrics["process_count"] = None
+
     disk = _directory_size_mb(getattr(sandbox, "repo_path", None))
     metrics["disk_usage_mb"] = round(disk, 2) if disk is not None else None
-    metrics["cpu_percent"] = None
     return metrics
+
 
 
 def _directory_size_mb(path) -> float | None:

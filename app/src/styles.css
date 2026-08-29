@@ -513,6 +513,7 @@ body {
 .badge--queued { color: var(--text-faint); background: rgba(139, 148, 158, 0.08); }
 .badge--running { color: var(--running); background: rgba(88, 166, 255, 0.1); }
 .badge--passed { color: var(--ok); background: rgba(63, 185, 80, 0.1); }
+.badge--findings { color: var(--warn); background: rgba(210, 153, 34, 0.1); }
 .badge--failed { color: var(--bad); background: rgba(248, 81, 73, 0.1); }
 .badge--error { color: var(--warn); background: rgba(210, 153, 34, 0.1); }
 
@@ -589,6 +590,7 @@ body {
 
 .sandbox--running { border-color: rgba(88, 166, 255, 0.4); }
 .sandbox--passed { border-color: rgba(63, 185, 80, 0.35); }
+.sandbox--findings { border-color: rgba(210, 153, 34, 0.35); }
 .sandbox--failed { border-color: rgba(248, 81, 73, 0.35); }
 
 .sandbox__id { font-family: var(--mono); font-size: 10px; color: var(--text-faint); letter-spacing: 0.08em; text-transform: uppercase; }

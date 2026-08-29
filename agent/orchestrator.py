@@ -197,7 +197,9 @@ class AuditionOrchestrator:
                 "One or more suites could not be evaluated.",
             )
         elif any(result.status == Status.FAIL for result in suite_results):
-            candidate_result.status = CandidateStatus.failed
+            # The candidate ran to completion; the suites found something.
+            # That is a verdict, not a failure to evaluate.
+            candidate_result.status = CandidateStatus.findings
         else:
             candidate_result.status = CandidateStatus.passed
 

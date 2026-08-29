@@ -1,62 +1,59 @@
 # Sentrya
 
-AI-powered runtime security testing for open-source repositories using isolated **Daytona sandboxes**.
+**Stop choosing libraries by stars. Make them audition.**
 
-## Problem
+Sentrya helps developers choose between competing open-source packages using
+*measured evidence* instead of GitHub stars or README claims. You describe what you
+need, name the candidates, and each one is installed and exercised in its own isolated
+environment while five runtime suites watch what it actually does.
 
-GitHub provides tools such as CodeQL, Dependabot, and secret scanning to identify many common security issues. However, these tools primarily analyze source code, dependencies, and known vulnerability patterns.
+![Sentrya dashboard](docs/screenshot.png)
 
-They don't fully answer a different question:
+## The problem
 
-> **What actually happens when the project is running and we actively test it?**
+GitHub gives you CodeQL, Dependabot and secret scanning — all of which read *source*.
+None of them answer the question you actually have when you add a dependency:
 
-Sentrya addresses this by running repositories in isolated sandboxes using Daytona and applying custom runtime security tests.
+> **What happens when this thing runs?**
 
-## How It Works
+Sentrya answers it by running each candidate and measuring the result.
 
-A user provides a GitHub repository or asks the agent to find a suitable open-source repository for a specific purpose.
+## What it measures
 
-The agent:
+Every candidate runs the same five-suite battery, in parallel, each in its own sandbox:
 
-* Analyzes the repository
-* Identifies relevant entry points and attack surfaces
-* Selects appropriate tests
-* Adapts the tests to the repository
-* Runs them in isolated Daytona sandboxes
-* Collects and interprets the results
-* Generates a security report
+| Suite | What it checks |
+| --- | --- |
+| **Filesystem** | Writes outside the sandbox working directory, path traversal |
+| **Fuzzing** | Behaviour under malformed, hostile and boundary input |
+| **Injection** | SQL, command, path and template injection surfaces |
+| **Network** | Outbound connections at import time and at call time |
+| **Resources** | Peak memory, CPU and disk against configured limits |
 
-Tests can run independently and in parallel, with each test type using its own sandbox.
+Results stream into the scoreboard as each suite lands — you watch the battery fill in
+per candidate rather than staring at a spinner. Click any row for the evidence behind
+the verdict: per-suite findings, failed cases, timings and runtime behaviour.
 
-## Testing
-
-The initial testing framework includes five custom runtime tests:
-
-* **Fuzzing** — malformed and unexpected inputs
-* **Injection** — SQL, command, path traversal, and template injection
-* **Filesystem** — unexpected file access and path traversal
-* **Network** — unexpected outbound connections and runtime network behavior
-* **Resource abuse** — CPU, memory, disk, and process consumption
-
-These tests are implemented in the `testing/` module. They are predefined by the project rather than customizable by the end user.
-
-The agent is responsible for adapting the tests to each repository.
+The recommendation comes from the backend's deterministic score. **There is no LLM in
+the frontend and no LLM deciding the winner** — the ranking is a function of what was
+measured.
 
 ## Running it
-
-One command starts both halves:
 
 ```bash
 ./dev.sh
 ```
 
-* App — <http://localhost:5173>
-* Agent API — <http://127.0.0.1:8000> (OpenAPI docs at `/docs`)
+* **App** — <http://localhost:5173>
+* **Agent API** — <http://127.0.0.1:8000> (OpenAPI docs at `/docs`)
 
-`dev.sh` creates `.venv`, installs `requirements.txt`, installs the app's npm
-dependencies on first run, then starts the agent and the Vite dev server together.
+First run creates `.venv`, installs `requirements.txt` and the app's npm dependencies,
+then starts both halves together. Ctrl+C stops everything.
 
-To run the halves separately:
+Requires Python 3.11+ and Node 18+. No API keys — the suites run in local sandboxes.
+
+<details>
+<summary>Running the halves separately</summary>
 
 ```bash
 # agent + testing
@@ -66,19 +63,21 @@ PYTHONPATH=. .venv/bin/python -m uvicorn agent.server:app --port 8000
 # app
 cd app && npm install && npm run dev
 ```
+</details>
 
-The app auto-detects the agent. If `/api/health` answers it runs live; if not it
-falls back to a built-in demo mode so the UI is always usable. Force either way with
+The app auto-detects the agent: if `/api/health` answers it runs live, otherwise it
+falls back to a built-in demo mode so the UI is never dead. Force either way with
 `VITE_DEMO_MODE=true|false` in `app/.env`.
 
-## How the parts talk
+## Architecture
 
 ```text
-app/  ──HTTP──▶  agent/  ──in-process──▶  testing/  ──▶  sandboxes
- UI              orchestrator             5 suites       one per suite
+app/  ──HTTP──▶  agent/  ──in-process──▶  testing/  ──▶  sandbox per suite
+ React UI        orchestrator             5 suites       isolated, parallel
 ```
 
-The app knows four endpoints and nothing else about how an evaluation happens:
+The three components are independent. The app knows five endpoints and nothing about
+how an evaluation happens — swap the entire testing backend and the UI is unchanged.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -89,47 +88,34 @@ The app knows four endpoints and nothing else about how an evaluation happens:
 | `DELETE` | `/api/auditions/{id}` | cancel |
 
 The app polls `GET /api/auditions/{id}` while a run is in flight. The orchestrator
-writes each suite into the store the moment it lands, which is what makes results
+writes each suite into the store the moment it lands — that is what makes results
 appear progressively instead of all at once.
 
 `agent/models.py` and `app/src/types/audition.ts` are the same data model in two
-languages — change one and change the other.
+languages. Change one, change the other.
 
-## Project Structure
+### Layout
 
 ```text
-project/
-├── app/        # User interface / API
-├── agent/      # AI agent for repository analysis and orchestration
-├── testing/    # Runtime security tests
-└── README.md
+├── app/        # React + TypeScript dashboard (Vite)
+├── agent/      # FastAPI orchestrator — runs candidates, scores, recommends
+├── testing/    # The five runtime suites + sandbox management
+└── dev.sh      # Starts everything
 ```
 
-### `app/`
+## Status
 
-Handles user interaction, repository input, testing requests, and displaying results.
+Working end to end: five suites execute in parallel per candidate, results stream to
+the dashboard, scores and the recommendation are computed from measured output.
 
-### `agent/`
+Known scaffolding, ahead of production use:
 
-Analyzes repositories, selects and configures tests, and interprets their results.
+* Candidates are exercised through a generated subject program rather than a real
+  `pip install` of the package — the harness is real, the subject is not yet.
+* `LocalSandbox` is process-level isolation; the Daytona adapter is stubbed and needs
+  SDK wiring before untrusted code should be run.
+* The store is in-memory and unbounded.
 
-### `testing/`
+## Tech
 
-Contains the reusable runtime security testing framework and Daytona sandbox integration.
-
-## Future Features
-
-* Automatically discover suitable open-source repositories
-* Validate new features before creating pull requests
-* Automatically fix discovered issues
-* Iteratively test changes in isolated sandboxes
-* Compare original and modified project behavior
-
-## Tech Stack
-
-* Python
-* FastAPI
-* Daytona
-* LLM-based agent
-* GitHub
-* Custom runtime security tests
+Python · FastAPI · React · TypeScript · Vite · Daytona (planned)

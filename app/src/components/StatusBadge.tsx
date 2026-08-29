@@ -3,7 +3,8 @@ import type { CandidateStatus } from "../types/audition";
 const LABELS: Record<CandidateStatus, string> = {
   queued: "Queued",
   running: "Running",
-  passed: "Passed",
+  passed: "Clean",
+  findings: "Findings",
   failed: "Failed",
   error: "Error",
 };
@@ -12,6 +13,7 @@ const GLYPHS: Record<CandidateStatus, string> = {
   queued: "○",
   running: "●",
   passed: "✓",
+  findings: "!",
   failed: "✗",
   error: "⚠",
 };
