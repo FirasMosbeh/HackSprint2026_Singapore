@@ -197,10 +197,33 @@ KIMI_MODEL=kimi-k2-0905-preview ./audition run ...
 
 | Variable | Needed for | Where to get it |
 | -------- | ---------- | --------------- |
-| `KIMI_API_KEY` | Kimi writes the conformance suite and the closing sentence | [platform.moonshot.ai](https://platform.moonshot.ai/console/api-keys) |
-| `KIMI_MODEL`, `KIMI_BASE_URL` | overriding the model or the endpoint | optional; defaults to `kimi-k2.6` |
+| `LLM_API_KEY` | writing the conformance suite and the closing sentence | any OpenAI-compatible provider (below) |
+| `LLM_BASE_URL` | the endpoint | e.g. `https://api.groq.com/openai/v1` |
+| `LLM_MODEL` | the model id | `./audition config --models` lists what your key can see |
+| `KIMI_API_KEY` / `KIMI_MODEL` / `KIMI_BASE_URL` | aliases for the three above | Moonshot direct: [platform.moonshot.ai](https://platform.moonshot.ai/console/api-keys) |
 | `DAYTONA_API_KEY` | `--provider daytona` | [app.daytona.io](https://app.daytona.io) → Dashboard → Keys |
-| `DAYTONA_TARGET`, `DAYTONA_API_URL` | non-default region or control plane | optional; only if your dashboard shows one |
+| `DAYTONA_TARGET`, `DAYTONA_API_URL` | non-default region or control plane | optional |
+
+### Any OpenAI-compatible provider works
+
+The model client speaks plain `chat/completions`, so it is not tied to one
+vendor. Several free providers serve **Kimi K2 itself**, which means the
+sponsor line stays literally true on a free key — and the scorecard says which
+endpoint served it (`7 cases from kimi via groq`) rather than quietly implying
+Moonshot.
+
+```bash
+# Groq — free, no card, and it hosts Kimi K2
+LLM_API_KEY=gsk_...
+LLM_BASE_URL=https://api.groq.com/openai/v1
+LLM_MODEL=moonshotai/kimi-k2-instruct
+```
+
+Model ids move around. Run `./audition config --models` to ask your endpoint
+what it actually serves; it flags the case where `LLM_MODEL` is not in the list.
+
+If the model is unreachable, rate-limited or out of balance, Audition prints the
+reason and falls back to the offline generator rather than failing the run.
 
 ### Running against Daytona
 

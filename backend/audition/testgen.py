@@ -67,7 +67,7 @@ def generate(
             source = _generate_with_kimi(requirement, candidates, api_key)
             names = _validate(source)
             return source, TestSuiteInfo(
-                generated_by="kimi",
+                generated_by=config.llm_label(),
                 model=config.kimi_model(),
                 n_cases=len(names),
                 source=source,

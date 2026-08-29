@@ -76,7 +76,9 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--no-browser", action="store_true")
 
     sub.add_parser("rule", help="print the ranking rule and exit")
-    sub.add_parser("config", help="show which keys are wired up, and where they came from")
+    cfg = sub.add_parser("config", help="show which keys are wired up, and where they came from")
+    cfg.add_argument("--models", action="store_true",
+                     help="ask the configured LLM endpoint which models it actually serves")
     return parser
 
 
@@ -86,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "config":
-        return _print_config()
+        return _list_models() if args.models else _print_config()
     if args.command == "rule":
         return _print_rule()
     if args.command == "demo":
@@ -136,6 +138,42 @@ def _print_config() -> int:
     print(f"   · test suite      {'kimi' if kimi else 'offline generator (no key set)'}")
     print(f"   · closing verdict {'kimi' if kimi else 'template (no key set)'}")
     print("\n  none of this is required — `audition demo` works with an empty config.\n")
+    return EXIT_OK
+
+
+def _list_models() -> int:
+    """Model ids move around between providers and releases; ask rather than guess."""
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    key = config.llm_api_key()
+    base = config.llm_base_url()
+    if not key:
+        print("audition: no LLM_API_KEY (or KIMI_API_KEY) set", file=sys.stderr)
+        return EXIT_ERROR
+
+    print(f"\n  endpoint: {base}", flush=True)  # before any stderr, so it reads in order
+    req = urllib.request.Request(f"{base}/models", headers={"Authorization": f"Bearer {key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = _json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:300]
+        print(f"  HTTP {exc.code}: {detail}\n", file=sys.stderr)
+        return EXIT_ERROR
+    except Exception as exc:
+        print(f"  could not reach it: {type(exc).__name__}: {exc}\n", file=sys.stderr)
+        return EXIT_ERROR
+
+    ids = sorted(m.get("id", "?") for m in body.get("data", []))
+    print(f"  {len(ids)} models your key can see:\n")
+    for name in ids:
+        marker = "  <- current LLM_MODEL" if name == config.llm_model() else ""
+        print(f"    {name}{marker}")
+    if config.llm_model() not in ids:
+        print(f"\n  warning: LLM_MODEL={config.llm_model()!r} is not in that list")
+    print()
     return EXIT_OK
 
 

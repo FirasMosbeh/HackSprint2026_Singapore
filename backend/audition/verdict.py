@@ -36,7 +36,7 @@ def write(report: Report) -> tuple[str, str]:
     api_key = config.kimi_api_key()
     if api_key:
         try:
-            return _ask_kimi(report, facts, api_key), "kimi"
+            return _ask_kimi(report, facts, api_key), config.llm_label()
         except (urllib.error.URLError, OSError, KeyError, IndexError, json.JSONDecodeError):
             pass
     return _template(report), "audition"

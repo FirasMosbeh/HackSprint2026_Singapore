@@ -23,20 +23,62 @@ DEFAULT_KIMI_MODEL = "kimi-k2.6"
 DEFAULT_KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 
 
-def kimi_api_key() -> str | None:
-    return os.environ.get("KIMI_API_KEY") or os.environ.get("MOONSHOT_API_KEY")
+def llm_api_key() -> str | None:
+    """Any OpenAI-compatible endpoint works, so the neutral names win and the
+    KIMI_/MOONSHOT_ ones remain as aliases. Groq, OpenRouter and Google's
+    compatibility endpoint all speak the same chat/completions dialect --
+    several of them serve Kimi K2 itself."""
+    return (
+        os.environ.get("LLM_API_KEY")
+        or os.environ.get("KIMI_API_KEY")
+        or os.environ.get("MOONSHOT_API_KEY")
+    )
 
 
-def kimi_model() -> str:
-    return os.environ.get("KIMI_MODEL") or DEFAULT_KIMI_MODEL
+def llm_model() -> str:
+    return os.environ.get("LLM_MODEL") or os.environ.get("KIMI_MODEL") or DEFAULT_KIMI_MODEL
 
 
-def kimi_base_url() -> str:
-    return (os.environ.get("KIMI_BASE_URL") or DEFAULT_KIMI_BASE_URL).rstrip("/")
+def llm_base_url() -> str:
+    base = (
+        os.environ.get("LLM_BASE_URL")
+        or os.environ.get("KIMI_BASE_URL")
+        or DEFAULT_KIMI_BASE_URL
+    )
+    return base.rstrip("/")
+
+
+def llm_label() -> str:
+    """What actually wrote the suite, named honestly.
+
+    Kimi served by Groq is still Kimi, and saying so beats both "kimi" (which
+    hides the endpoint) and "groq" (which hides the model).
+    """
+    from urllib.parse import urlparse
+
+    host = (urlparse(llm_base_url()).hostname or "").lower()
+    model = llm_model().lower()
+    family = "kimi" if "kimi" in model or "moonshot" in model else model.split("/")[-1]
+    if "moonshot" in host:
+        return "kimi"
+    if not host or host in ("localhost", "::1") or host.replace(".", "").isdigit():
+        return f"{family} via local endpoint"
+    vendor = host.replace("api.", "").split(".")[0]
+    return f"{family} via {vendor}"
+
+
+# Backwards-compatible aliases; the codebase used these names first.
+kimi_api_key = llm_api_key
+kimi_model = llm_model
+kimi_base_url = llm_base_url
+
 
 # Reported by `audition config` so it is obvious what is wired up and what is not.
 KNOWN_KEYS = (
-    ("KIMI_API_KEY", "Kimi writes the conformance suite and the closing sentence"),
+    ("LLM_API_KEY", "any OpenAI-compatible key (Groq, OpenRouter, Moonshot, ...)"),
+    ("LLM_BASE_URL", "endpoint, e.g. https://api.groq.com/openai/v1"),
+    ("LLM_MODEL", "e.g. moonshotai/kimi-k2-instruct"),
+    ("KIMI_API_KEY", "alias for LLM_API_KEY (Moonshot direct)"),
     ("MOONSHOT_API_KEY", "alias for KIMI_API_KEY"),
     ("KIMI_MODEL", f"default {DEFAULT_KIMI_MODEL}"),
     ("KIMI_BASE_URL", f"default {DEFAULT_KIMI_BASE_URL}"),
