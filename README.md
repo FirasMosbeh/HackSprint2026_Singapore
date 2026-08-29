@@ -10,7 +10,7 @@ They don't fully answer a different question:
 
 > **What actually happens when the project is running and we actively test it?**
 
-Sentrya addresses this by running repositories in isolated sandboxes and applying custom runtime security tests.
+Sentrya addresses this by running repositories in isolated sandboxes using Daytona and applying custom runtime security tests.
 
 ## How It Works
 

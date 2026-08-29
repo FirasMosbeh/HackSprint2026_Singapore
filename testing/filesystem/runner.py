@@ -21,8 +21,9 @@ class FilesystemTest(SecurityTest):
             result.errors.append("sandbox does not expose repo_path")
             return result
 
-        before = sandbox.snapshot(base_root)
-        marker_dir = Path(getattr(sandbox, "root", base_root)) / "testing-markers"
+        snapshot_root = Path(getattr(sandbox, "root", base_root))
+        before = sandbox.snapshot(snapshot_root)
+        marker_dir = snapshot_root / "testing-markers"
         marker_dir.mkdir(parents=True, exist_ok=True)
         marker = marker_dir / "marker.txt"
         marker.write_text("filesystem-test-marker", encoding="utf-8")
@@ -69,14 +70,20 @@ class FilesystemTest(SecurityTest):
                         )
                     )
 
-        after = sandbox.snapshot(base_root)
+        after = sandbox.snapshot(snapshot_root)
         created = sorted(set(after) - set(before))
         deleted = sorted(set(before) - set(after))
         modified = sorted(
             path for path in set(after) & set(before) if after[path].get("sha256") != before[path].get("sha256")
         )
 
-        unexpected = [path for path in created + modified + deleted if not path.startswith("testing-markers")]
+        unexpected = []
+        for path in created + modified + deleted:
+            if path.startswith("testing-markers"):
+                continue
+            if Path(path).parts and Path(path).parts[0] == "repository":
+                continue
+            unexpected.append(path)
         result.metrics.update(
             {
                 "before_count": len(before),
