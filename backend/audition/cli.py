@@ -201,8 +201,12 @@ def _run(args) -> int:
     suite_source, suite_info = testgen.generate(
         args.requirement, [c.name for c in candidates], use_model=not args.no_kimi
     )
-    print(f"  {suite_info.n_cases} cases from {suite_info.generated_by}"
-          + (f" ({suite_info.model})" if suite_info.model else ""))
+    # The label often already names the model ("kimi via groq"); repeating it
+    # in parentheses just makes the line harder to read.
+    detail = ""
+    if suite_info.model and suite_info.model not in suite_info.generated_by:
+        detail = f" ({suite_info.model})"
+    print(f"  {suite_info.n_cases} cases from {suite_info.generated_by}{detail}")
 
     provider = _make_provider(args)
     if provider is None:

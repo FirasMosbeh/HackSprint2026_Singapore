@@ -23,16 +23,31 @@ DEFAULT_KIMI_MODEL = "kimi-k2.6"
 DEFAULT_KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 
 
+def is_local_endpoint() -> bool:
+    from urllib.parse import urlparse
+
+    host = (urlparse(llm_base_url()).hostname or "").lower()
+    return host in ("localhost", "::1") or host.replace(".", "").isdigit()
+
+
 def llm_api_key() -> str | None:
     """Any OpenAI-compatible endpoint works, so the neutral names win and the
     KIMI_/MOONSHOT_ ones remain as aliases. Groq, OpenRouter and Google's
     compatibility endpoint all speak the same chat/completions dialect --
-    several of them serve Kimi K2 itself."""
-    return (
+    several of them serve Kimi K2 itself.
+
+    Ollama and LM Studio require the Authorization header but ignore its
+    value, so pointing at a local server is enough on its own -- asking
+    someone to invent a fake key for their own machine is a papercut.
+    """
+    key = (
         os.environ.get("LLM_API_KEY")
         or os.environ.get("KIMI_API_KEY")
         or os.environ.get("MOONSHOT_API_KEY")
     )
+    if not key and is_local_endpoint():
+        return "local"
+    return key
 
 
 def llm_model() -> str:

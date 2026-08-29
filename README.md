@@ -219,6 +219,25 @@ LLM_BASE_URL=https://api.groq.com/openai/v1
 LLM_MODEL=moonshotai/kimi-k2-instruct
 ```
 
+### Or run the model on your own machine
+
+Ollama and LM Studio both expose an OpenAI-compatible endpoint, so no key and
+no account are needed at all — pointing at localhost is enough:
+
+```bash
+brew install ollama && ollama serve      # in one terminal
+ollama pull qwen2.5-coder:7b             # ~4.7 GB
+
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=qwen2.5-coder:7b
+```
+
+A local server ignores the Authorization header but requires it to be present,
+so Audition supplies a placeholder rather than asking you to invent a key for
+your own machine. Expect weaker suites than a frontier model produces: the
+validator rejects anything that does not compile or cannot fail, retries once,
+then falls back to the offline generator.
+
 Model ids move around. Run `./audition config --models` to ask your endpoint
 what it actually serves; it flags the case where `LLM_MODEL` is not in the list.
 
