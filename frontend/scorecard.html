@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audition — scorecard</title>
+<style>
+  :root {
+    --bg: #0c0e13;  --panel: #141821;  --line: #242a38;
+    --ink: #e8ecf4;  --dim: #8b95ab;   --faint: #5c657a;
+    --good: #46d97f; --bad: #ff5c6c;   --warn: #ffc857;  --accent: #7aa2ff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 var(--mono);
+    padding: 28px clamp(16px, 4vw, 48px) 64px;
+  }
+  a { color: var(--accent); }
+
+  header { border-bottom: 1px solid var(--line); padding-bottom: 18px; margin-bottom: 22px; }
+  .eyebrow { color: var(--faint); letter-spacing: .16em; text-transform: uppercase; font-size: 11px; }
+  h1 { font-size: clamp(19px, 2.4vw, 27px); margin: 8px 0 10px; font-weight: 600; letter-spacing: -.01em; }
+  h1 .q { color: var(--accent); }
+  .meta { color: var(--dim); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  .status { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+  .running .dot { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 940px; }
+  th, td { text-align: left; padding: 11px 14px; white-space: nowrap; }
+  thead th {
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--faint); border-bottom: 1px solid var(--line); font-weight: 600;
+  }
+  tbody tr.row { border-top: 1px solid var(--line); cursor: pointer; }
+  tbody tr.row:first-child { border-top: none; }
+  tbody tr.row:hover { background: #1a1f2b; }
+  tbody tr.row td:first-child { font-weight: 600; }
+
+  tr.winner td { background: rgba(70, 217, 127, .08); }
+  tr.winner td:first-child { box-shadow: inset 3px 0 0 var(--good); color: var(--good); }
+  tr.dq td { color: var(--faint); }
+  tr.dq td:first-child { box-shadow: inset 3px 0 0 var(--bad); color: var(--bad); }
+  tr.pending td { color: var(--faint); font-style: italic; }
+
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; border: 1px solid transparent; }
+  .pill.good { color: var(--good); background: rgba(70,217,127,.1); border-color: rgba(70,217,127,.3); }
+  .pill.bad  { color: var(--bad);  background: rgba(255,92,108,.1); border-color: rgba(255,92,108,.35); }
+  .pill.warn { color: var(--warn); background: rgba(255,200,87,.1); border-color: rgba(255,200,87,.3); }
+  .pill.mute { color: var(--dim);  background: #1b2029; border-color: var(--line); }
+
+  .bar { display: inline-block; height: 4px; border-radius: 2px; background: var(--accent); opacity: .55; vertical-align: middle; margin-left: 8px; }
+
+  tr.detail td { padding: 0; border-top: none; }
+  .detail-inner { padding: 4px 18px 20px 18px; background: #10141c; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .detail h4 { margin: 0 0 8px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+  .detail ul { margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+  .detail li { padding: 3px 0; color: var(--dim); display: flex; gap: 8px; align-items: baseline; }
+  .detail li .mark { flex: none; width: 12px; }
+  .pass .mark { color: var(--good); } .fail .mark { color: var(--bad); }
+  .detail li .why { color: var(--faint); }
+  .empty { color: var(--faint); font-size: 12.5px; }
+  .evt { font-size: 12px; color: var(--warn); word-break: break-all; white-space: normal; }
+  .brk { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; font-size: 12.5px; color: var(--dim); }
+  .brk .track { height: 5px; background: #232a38; border-radius: 3px; overflow: hidden; }
+  .brk .fill { height: 100%; background: var(--accent); }
+
+  .verdict { margin-top: 22px; border: 1px solid var(--line); border-left: 3px solid var(--good); border-radius: 10px; background: var(--panel); padding: 18px 20px; }
+  .verdict .who { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+  .verdict p { margin: 0; font-size: clamp(14px, 1.6vw, 17px); line-height: 1.55; }
+
+  .rule { margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 16px 20px; color: var(--dim); font-size: 12.5px; }
+  .rule code { color: var(--ink); display: block; white-space: pre-wrap; line-height: 1.7; }
+  .rule .gates { margin-top: 10px; color: var(--bad); }
+  footer { margin-top: 22px; color: var(--faint); font-size: 12px; }
+  .hint { color: var(--faint); font-size: 11.5px; margin: 8px 2px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Audition</div>
+  <h1>Which library is actually best for <span class="q" id="requirement">…</span>?</h1>
+  <div class="meta" id="meta"></div>
+</header>
+
+<div class="scroll">
+  <table>
+    <thead><tr>
+      <th>Candidate</th><th>Installs</th><th>My tests</th><th>Speed</th>
+      <th>Peak mem</th><th>Behaviour</th><th>Footprint</th><th>Maintained</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+<p class="hint">Click any row for the individual cases, the observed events and the score breakdown.</p>
+
+<div class="verdict" id="verdict" hidden>
+  <div class="who" id="verdict-who"></div>
+  <p id="verdict-text"></p>
+</div>
+
+<div class="rule" id="rule" hidden>
+  The recommendation is arithmetic over measured facts, not a model's judgement — disagree with the weights, not with a black box.
+  <code id="formula"></code>
+  <div class="gates" id="gates"></div>
+</div>
+
+<footer id="footer"></footer>
+
+<script>
+const open = new Set();
+let lastPayload = "";
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = (v, unit, digits = 0) =>
+  (v === null || v === undefined || v === 0) ? "—" : `${Number(v).toFixed(digits)} ${unit}`;
+
+function maintained(m) {
+  if (!m || m.age_days === null || m.age_days === undefined) return "unknown";
+  const d = m.age_days;
+  if (d < 31) return `${Math.max(d, 1)} days`;
+  if (d < 365) return `${Math.floor(d / 30)} months`;
+  return `${Math.round(d / 365)} years`;
+}
+
+function behaviourPill(b) {
+  const flag = b?.flag ?? "unknown";
+  const cls = flag === "quiet" ? "good" : flag === "unknown" ? "mute" : "bad";
+  return `<span class="pill ${cls}">${esc(flag)}</span>`;
+}
+
+function conformanceCell(c) {
+  if (!c || !c.total) return "—";
+  const cls = c.rate >= 1 ? "good" : c.rate >= 0.6 ? "warn" : "bad";
+  const pct = Math.round((c.rate || 0) * 100);
+  return `<span class="pill ${cls}">${c.passed} / ${c.total}</span>`
+       + `<span class="bar" style="width:${Math.max(pct * 0.34, 2)}px"></span>`;
+}
+
+function render(data) {
+  document.getElementById("requirement").textContent = data.requirement || "…";
+  document.title = `Audition — ${data.requirement || "scorecard"}`;
+
+  const done = data.status === "done";
+  const forks = (data.candidates || []).filter(c => c.fork && c.fork.method);
+  const method = forks.length ? forks[0].fork.method : "—";
+  document.getElementById("meta").innerHTML = [
+    `<span class="status ${done ? "" : "running"}"><span class="dot"></span>${done ? "complete" : "running"}</span>`,
+    `Python <b>${esc(data.python)}</b>`,
+    `<b>${esc(data.provider)}</b> · one base machine, forked ${forks.length || (data.candidates || []).length} ways <b>(${esc(method)})</b>`,
+    `<b>${data.suite?.n_cases ?? 0}</b> conformance cases from <b>${esc(data.suite?.generated_by ?? "?")}</b>`,
+  ].join("");
+
+  const tbody = document.getElementById("rows");
+  tbody.innerHTML = "";
+
+  for (const c of data.candidates || []) {
+    const failed = c.status === "done" && !c.install?.ok;
+    const busy = c.status === "pending" || c.status === "running";
+    const cls = c.name === data.winner ? "winner" : c.disqualified ? "dq" : busy ? "pending" : "";
+
+    const cells = busy
+      ? [`<em>${esc(c.stage || c.status)}…</em>`, "—", "—", "—", "—", "—", "—"]
+      : failed
+        ? [`<span class="pill bad">failed</span>`, "—", "—", "—", "—", "—", maintained(c.maintenance)]
+        : [
+            `<span class="pill good">clean</span>`,
+            conformanceCell(c.conformance),
+            num(c.perf?.wall_ms, "ms"),
+            num(c.perf?.peak_mem_mb, "MB"),
+            behaviourPill(c.behaviour),
+            `${c.footprint?.deps ?? 0} deps · ${((c.footprint?.install_kb ?? 0) / 1024).toFixed(1)} MB`,
+            maintained(c.maintenance),
+          ];
+
+    const tr = document.createElement("tr");
+    tr.className = `row ${cls}`;
+    tr.innerHTML = `<td>${esc(c.name)}</td>` + cells.map(v => `<td>${v}</td>`).join("");
+    tr.onclick = () => { open.has(c.name) ? open.delete(c.name) : open.add(c.name); render(data); };
+    tbody.appendChild(tr);
+
+    if (open.has(c.name)) {
+      const dr = document.createElement("tr");
+      dr.className = "detail";
+      dr.innerHTML = `<td colspan="8"><div class="detail-inner">${detail(c)}</div></td>`;
+      tbody.appendChild(dr);
+    }
+  }
+
+  const v = document.getElementById("verdict");
+  if (data.verdict) {
+    v.hidden = false;
+    document.getElementById("verdict-who").textContent =
+      data.winner
+        ? `Recommendation — chosen by the formula, explained by ${data.verdict_by || "audition"}`
+        : "No recommendation";
+    document.getElementById("verdict-text").textContent = data.verdict;
+    v.style.borderLeftColor = data.winner ? "var(--good)" : "var(--bad)";
+  } else { v.hidden = true; }
+
+  const r = document.getElementById("rule");
+  if (data.weights) {
+    r.hidden = false;
+    const w = data.weights;
+    document.getElementById("formula").textContent =
+      `score = ${w.conformance} x conformance_rate      # does it do the job\n`
+    + `      + ${w.maintenance} x maintenance_freshness # will it still work next year\n`
+    + `      + ${w.speed} x speed_percentile       # what it costs to run\n`
+    + `      + ${w.footprint} x footprint_percentile   # what it drags in\n`
+    + `      +  ${w.memory} x memory_percentile`;
+    document.getElementById("gates").textContent =
+      "hard gates — any one disqualifies, regardless of score:  " + (data.gate_rules || []).join("  ·  ");
+  }
+
+  document.getElementById("footer").textContent =
+    `started ${data.started_at || "—"}${data.finished_at ? ` · finished ${data.finished_at}` : ""}`
+    + ` · base prepared in ${data.base_prepared_seconds ?? 0}s`;
+}
+
+function detail(c) {
+  const parts = [];
+
+  if (c.gates?.length) {
+    parts.push(`<div class="detail"><h4>Disqualified</h4><ul>`
+      + c.gates.map(g => `<li class="fail"><span class="mark">✕</span><span>${esc(g)}</span></li>`).join("")
+      + `</ul></div>`);
+  }
+
+  const cases = c.conformance?.cases || [];
+  parts.push(`<div class="detail"><h4>Conformance cases</h4>` + (cases.length
+    ? `<ul>` + cases.map(t => `<li class="${t.passed ? "pass" : "fail"}">`
+        + `<span class="mark">${t.passed ? "✓" : "✕"}</span>`
+        + `<span>${esc(t.name.replace(/^test_\d*_?/, ""))}`
+        + (t.error ? ` <span class="why">— ${esc(t.error)}</span>` : "")
+        + `</span></li>`).join("") + `</ul>`
+    : `<p class="empty">not measured</p>`) + `</div>`);
+
+  const b = c.behaviour || {};
+  const events = [
+    ...(b.network || []).map(e => ["network", e]),
+    ...(b.writes || []).map(e => ["write outside package dir", e]),
+    ...(b.subprocesses || []).map(e => ["subprocess", e]),
+  ];
+  parts.push(`<div class="detail"><h4>Observed behaviour</h4>` + (events.length
+    ? `<ul>` + events.map(([k, e]) =>
+        `<li class="fail"><span class="mark">!</span><span class="evt"><b>${esc(k)}</b> ${esc(e)}</span></li>`).join("") + `</ul>`
+    : `<p class="empty">${b.observed ? "nothing outside its own directory" : "not observed"}</p>`) + `</div>`);
+
+  if (!c.install?.ok && c.status === "done") {
+    parts.push(`<div class="detail"><h4>Install log</h4><p class="evt">${esc(c.install?.log_tail || "no output")}</p></div>`);
+  }
+
+  const brk = c.breakdown || {};
+  const keys = Object.keys(brk);
+  if (keys.length) {
+    const max = { conformance: 50, maintenance: 20, speed: 15, footprint: 10, memory: 5 };
+    parts.push(`<div class="detail"><h4>Score ${c.score ?? "—"} / 100</h4><div class="brk">`
+      + keys.map(k => `<span>${esc(k)}</span>`
+          + `<span class="track"><span class="fill" style="width:${(brk[k] / (max[k] || 50)) * 100}%"></span></span>`
+          + `<span>${brk[k].toFixed(1)}</span>`).join("")
+      + `</div></div>`);
+  }
+
+  const deps = c.footprint?.dep_names || [];
+  if (deps.length) {
+    parts.push(`<div class="detail"><h4>What it installed</h4><ul>`
+      + deps.map(d => `<li><span class="mark">·</span><span>${esc(d)}</span></li>`).join("") + `</ul></div>`);
+  }
+  return parts.join("");
+}
+
+async function poll() {
+  try {
+    const res = await fetch("report.json?t=" + Date.now(), { cache: "no-store" });
+    if (res.ok) {
+      const text = await res.text();
+      if (text !== lastPayload) { lastPayload = text; render(JSON.parse(text)); }
+    }
+  } catch (_) { /* the run may not have written the first snapshot yet */ }
+  setTimeout(poll, 700);
+}
+poll();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+.audition/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+
+# pip build artefacts left behind by installing the local staged package
+build/
+dist/

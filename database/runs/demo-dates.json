@@ -1,0 +1,524 @@
+{
+  "requirement": "parse human-written dates like 'next tuesday' into a datetime",
+  "python": "3.13.5",
+  "provider": "local-fork",
+  "started_at": "2026-08-29T05:43:19+00:00",
+  "finished_at": "2026-08-29T05:43:25+00:00",
+  "status": "done",
+  "base_prepared_seconds": 2.3,
+  "suite": {
+    "generated_by": "offline-fallback",
+    "model": null,
+    "n_cases": 7,
+    "source": "\"\"\"Conformance suite (offline generator).\n\nRequirement: parse human-written dates like 'next tuesday' into a datetime\n\nThe adapter below is what lets one identical file run against every\ncandidate: it discovers each library's entry point by duck typing instead of\nhard-coding an API.\n\"\"\"\n\nimport datetime\n\n_ENTRY_NAMES = (\n    \"parse\", \"parse_datetime\", \"parsedatetime\", \"get\", \"to_datetime\",\n    \"from_string\", \"fromstring\", \"convert\", \"read\", \"loads\", \"decode\", \"run\",\n)\n_FACTORY_NAMES = (\"Calendar\", \"Parser\", \"DateParser\", \"Client\", \"Session\")\n\n\ndef _unwrap(value):\n    \"\"\"Libraries return the answer in different wrappers: a datetime, a tuple\n    of (result, flag), or an object with .datetime / .to_datetime().\"\"\"\n    if value is None:\n        return None\n    if isinstance(value, datetime.datetime):\n        return value\n    if isinstance(value, datetime.date):\n        return datetime.datetime(value.year, value.month, value.day)\n    if isinstance(value, tuple) and value:\n        if len(value) > 1 and isinstance(value[1], int) and value[1] == 0:\n            return None  # parsedatetime signals \"not understood\" with flag 0\n        return _unwrap(value[0])\n    for attr in (\"datetime\", \"naive\", \"_datetime\"):\n        inner = getattr(value, attr, None)\n        if isinstance(inner, (datetime.datetime, datetime.date)):\n            return _unwrap(inner)\n    for meth in (\"to_datetime\", \"datetime\"):\n        fn = getattr(value, meth, None)\n        if callable(fn):\n            try:\n                return _unwrap(fn())\n            except Exception:\n                pass\n    if hasattr(value, \"year\") and hasattr(value, \"month\"):\n        return value\n    return value\n\n\ndef call(lib, *args, **kwargs):\n    for name in _ENTRY_NAMES:\n        fn = getattr(lib, name, None)\n        if callable(fn) and not isinstance(fn, type):\n            return _unwrap(fn(*args, **kwargs))\n    for name in _FACTORY_NAMES:\n        factory = getattr(lib, name, None)\n        if isinstance(factory, type):\n            try:\n                inst = factory()\n            except Exception:\n                continue\n            for name2 in (\"parseDT\", \"parse\", \"get\", \"convert\", \"run\"):\n                fn = getattr(inst, name2, None)\n                if callable(fn):\n                    return _unwrap(fn(*args, **kwargs))\n    raise AssertionError(\"no usable entry point\")\n\n\ndef test_1_iso_date(lib):\n    got = call(lib, \"2026-03-05\")\n    assert got is not None, \"returned nothing for an ISO date\"\n    assert (got.year, got.month, got.day) == (2026, 3, 5)\n\n\ndef test_2_written_month(lib):\n    got = call(lib, \"March 5, 2026\")\n    assert got is not None, \"returned nothing for a written-out month\"\n    assert (got.year, got.month, got.day) == (2026, 3, 5)\n\n\ndef test_3_slashed_date(lib):\n    got = call(lib, \"2026/03/05\")\n    assert got is not None, \"returned nothing for a slash-separated date\"\n    assert (got.year, got.month, got.day) == (2026, 3, 5)\n\n\ndef test_4_relative_yesterday(lib):\n    got = call(lib, \"yesterday\")\n    assert got is not None, \"does not understand 'yesterday'\"\n    expected = datetime.datetime.now() - datetime.timedelta(days=1)\n    assert got.date() == expected.date()\n\n\ndef test_5_relative_in_n_days(lib):\n    got = call(lib, \"in 3 days\")\n    assert got is not None, \"does not understand 'in 3 days'\"\n    expected = datetime.datetime.now() + datetime.timedelta(days=3)\n    assert abs((got.date() - expected.date()).days) <= 1\n\n\ndef test_6_relative_weekday(lib):\n    got = call(lib, \"next tuesday\")\n    assert got is not None, \"does not understand 'next tuesday'\"\n    assert got.weekday() == 1, \"resolved 'next tuesday' to a day that is not a Tuesday\"\n    assert got.date() > datetime.datetime.now().date(), \"'next tuesday' resolved to the past\"\n\n\ndef test_7_rejects_nonsense(lib):\n    try:\n        got = call(lib, \"not a date at all, honestly\")\n    except AssertionError:\n        raise\n    except Exception:\n        return  # raising on garbage is a valid contract\n    assert got is None, \"claimed to parse a string that is not a date\"\n",
+    "case_names": [
+      "test_1_iso_date",
+      "test_2_written_month",
+      "test_3_slashed_date",
+      "test_4_relative_yesterday",
+      "test_5_relative_in_n_days",
+      "test_6_relative_weekday",
+      "test_7_rejects_nonsense"
+    ]
+  },
+  "candidates": [
+    {
+      "candidate": {
+        "spec": "dateparser",
+        "import_name": "dateparser",
+        "name": "dateparser"
+      },
+      "status": "done",
+      "stage": "",
+      "fork": {
+        "seconds": 0.326,
+        "method": "apfs-clone"
+      },
+      "install": {
+        "ok": true,
+        "seconds": 0.89,
+        "log_tail": "whl.metadata (1.7 kB)\nUsing cached dateparser-1.4.2-py3-none-any.whl (316 kB)\nUsing cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)\nUsing cached pytz-2026.3.post1-py2.py3-none-any.whl (508 kB)\nUsing cached regex-2026.7.19-cp313-cp313-macosx_11_0_arm64.whl (291 kB)\nUsing cached six-1.17.0-py2.py3-none-any.whl (11 kB)\nUsing cached tzlocal-5.4.4-py3-none-any.whl (18 kB)\nInstalling collected packages: pytz, tzlocal, six, regex, python-dateutil, dateparser\n\nSuccessfully installed dateparser-1.4.2 python-dateutil-2.9.0.post0 pytz-2026.3.post1 regex-2026.7.19 six-1.17.0 tzlocal-5.4.4"
+      },
+      "conformance": {
+        "total": 7,
+        "passed": 6,
+        "cases": [
+          {
+            "name": "test_1_iso_date",
+            "passed": true,
+            "ms": 24.821,
+            "error": null
+          },
+          {
+            "name": "test_2_written_month",
+            "passed": true,
+            "ms": 0.952,
+            "error": null
+          },
+          {
+            "name": "test_3_slashed_date",
+            "passed": true,
+            "ms": 0.497,
+            "error": null
+          },
+          {
+            "name": "test_4_relative_yesterday",
+            "passed": true,
+            "ms": 0.472,
+            "error": null
+          },
+          {
+            "name": "test_5_relative_in_n_days",
+            "passed": true,
+            "ms": 0.384,
+            "error": null
+          },
+          {
+            "name": "test_6_relative_weekday",
+            "passed": false,
+            "ms": 521.345,
+            "error": "AssertionError: does not understand 'next tuesday'"
+          },
+          {
+            "name": "test_7_rejects_nonsense",
+            "passed": true,
+            "ms": 4.974,
+            "error": null
+          }
+        ],
+        "rate": 0.8571428571428571
+      },
+      "perf": {
+        "wall_ms": 639.8,
+        "peak_mem_mb": 63.5,
+        "reps": 3
+      },
+      "footprint": {
+        "deps": 5,
+        "dep_names": [
+          "dateparser",
+          "python-dateutil",
+          "pytz",
+          "regex",
+          "six",
+          "tzlocal"
+        ],
+        "install_kb": 9188
+      },
+      "maintenance": {
+        "version": "1.4.2",
+        "last_release": "2026-08-04",
+        "age_days": 24,
+        "source": "pypi"
+      },
+      "behaviour": {
+        "network": [],
+        "writes": [],
+        "subprocesses": [],
+        "observed": true,
+        "flag": "quiet"
+      },
+      "gates": [],
+      "score": 62.86,
+      "breakdown": {
+        "conformance": 42.86,
+        "maintenance": 20.0,
+        "speed": 0.0,
+        "footprint": 0.0,
+        "memory": 0.0
+      },
+      "error": null,
+      "name": "dateparser",
+      "disqualified": false
+    },
+    {
+      "candidate": {
+        "spec": "arrow",
+        "import_name": "arrow",
+        "name": "arrow"
+      },
+      "status": "done",
+      "stage": "",
+      "fork": {
+        "seconds": 0.324,
+        "method": "apfs-clone"
+      },
+      "install": {
+        "ok": true,
+        "seconds": 0.5,
+        "log_tail": "ing tzdata (from arrow)\n  Using cached tzdata-2026.3-py2.py3-none-any.whl.metadata (1.4 kB)\nCollecting six>=1.5 (from python-dateutil>=2.7.0->arrow)\n  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)\nUsing cached arrow-1.4.0-py3-none-any.whl (68 kB)\nUsing cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)\nUsing cached six-1.17.0-py2.py3-none-any.whl (11 kB)\nUsing cached tzdata-2026.3-py2.py3-none-any.whl (348 kB)\nInstalling collected packages: tzdata, six, python-dateutil, arrow\n\nSuccessfully installed arrow-1.4.0 python-dateutil-2.9.0.post0 six-1.17.0 tzdata-2026.3"
+      },
+      "conformance": {
+        "total": 7,
+        "passed": 3,
+        "cases": [
+          {
+            "name": "test_1_iso_date",
+            "passed": true,
+            "ms": 0.451,
+            "error": null
+          },
+          {
+            "name": "test_2_written_month",
+            "passed": false,
+            "ms": 0.017,
+            "error": "ParserError: Expected an ISO 8601-like string, but was given 'March 5, 2026'. Try passing in a format string to resolve this."
+          },
+          {
+            "name": "test_3_slashed_date",
+            "passed": true,
+            "ms": 0.279,
+            "error": null
+          },
+          {
+            "name": "test_4_relative_yesterday",
+            "passed": false,
+            "ms": 0.986,
+            "error": "ParserError: Could not match input 'yesterday' to any of the following formats: YYYY-MM-DD, YYYY-M-DD, YYYY-M-D, YYYY/MM/DD, YYYY/M/DD, YYYY/M/D, YYYY.MM.DD, YYYY.M.DD, YYYY.M.D, YYYYMMDD, YYYY-DDDD, YYYYDDDD, YYYY-MM, YYYY/MM, YYYY.MM, YYYY, W."
+          },
+          {
+            "name": "test_5_relative_in_n_days",
+            "passed": false,
+            "ms": 0.01,
+            "error": "ParserError: Expected an ISO 8601-like string, but was given 'in 3 days'. Try passing in a format string to resolve this."
+          },
+          {
+            "name": "test_6_relative_weekday",
+            "passed": false,
+            "ms": 0.025,
+            "error": "ParserError: Invalid time component provided. Please specify a format or provide a valid time component in the basic or extended ISO 8601 time format."
+          },
+          {
+            "name": "test_7_rejects_nonsense",
+            "passed": true,
+            "ms": 0.007,
+            "error": null
+          }
+        ],
+        "rate": 0.42857142857142855
+      },
+      "perf": {
+        "wall_ms": 36.7,
+        "peak_mem_mb": 17.2,
+        "reps": 3
+      },
+      "footprint": {
+        "deps": 3,
+        "dep_names": [
+          "arrow",
+          "python-dateutil",
+          "six",
+          "tzdata"
+        ],
+        "install_kb": 4308
+      },
+      "maintenance": {
+        "version": "1.4.0",
+        "last_release": "2025-10-18",
+        "age_days": 314,
+        "source": "pypi"
+      },
+      "behaviour": {
+        "network": [],
+        "writes": [],
+        "subprocesses": [],
+        "observed": true,
+        "flag": "quiet"
+      },
+      "gates": [
+        "conformance 43% < 60%"
+      ],
+      "score": null,
+      "breakdown": {},
+      "error": null,
+      "name": "arrow",
+      "disqualified": true
+    },
+    {
+      "candidate": {
+        "spec": "parsedatetime",
+        "import_name": "parsedatetime",
+        "name": "parsedatetime"
+      },
+      "status": "done",
+      "stage": "",
+      "fork": {
+        "seconds": 0.323,
+        "method": "apfs-clone"
+      },
+      "install": {
+        "ok": true,
+        "seconds": 0.31,
+        "log_tail": "Collecting parsedatetime\n  Using cached parsedatetime-2.6-py3-none-any.whl.metadata (4.7 kB)\nUsing cached parsedatetime-2.6-py3-none-any.whl (42 kB)\nInstalling collected packages: parsedatetime\nSuccessfully installed parsedatetime-2.6"
+      },
+      "conformance": {
+        "total": 7,
+        "passed": 7,
+        "cases": [
+          {
+            "name": "test_1_iso_date",
+            "passed": true,
+            "ms": 1.245,
+            "error": null
+          },
+          {
+            "name": "test_2_written_month",
+            "passed": true,
+            "ms": 0.302,
+            "error": null
+          },
+          {
+            "name": "test_3_slashed_date",
+            "passed": true,
+            "ms": 0.128,
+            "error": null
+          },
+          {
+            "name": "test_4_relative_yesterday",
+            "passed": true,
+            "ms": 0.166,
+            "error": null
+          },
+          {
+            "name": "test_5_relative_in_n_days",
+            "passed": true,
+            "ms": 0.557,
+            "error": null
+          },
+          {
+            "name": "test_6_relative_weekday",
+            "passed": true,
+            "ms": 0.131,
+            "error": null
+          },
+          {
+            "name": "test_7_rejects_nonsense",
+            "passed": true,
+            "ms": 0.101,
+            "error": null
+          }
+        ],
+        "rate": 1.0
+      },
+      "perf": {
+        "wall_ms": 34.4,
+        "peak_mem_mb": 14.7,
+        "reps": 3
+      },
+      "footprint": {
+        "deps": 0,
+        "dep_names": [
+          "parsedatetime"
+        ],
+        "install_kb": 392
+      },
+      "maintenance": {
+        "version": "2.6",
+        "last_release": "2020-05-31",
+        "age_days": 2280,
+        "source": "pypi"
+      },
+      "behaviour": {
+        "network": [],
+        "writes": [],
+        "subprocesses": [],
+        "observed": true,
+        "flag": "quiet"
+      },
+      "gates": [],
+      "score": 80.0,
+      "breakdown": {
+        "conformance": 50.0,
+        "maintenance": 0.0,
+        "speed": 15.0,
+        "footprint": 10.0,
+        "memory": 5.0
+      },
+      "error": null,
+      "name": "parsedatetime",
+      "disqualified": false
+    },
+    {
+      "candidate": {
+        "spec": "pendulum==2.1.2",
+        "import_name": "pendulum",
+        "name": "pendulum"
+      },
+      "status": "done",
+      "stage": "",
+      "fork": {
+        "seconds": 0.335,
+        "method": "apfs-clone"
+      },
+      "install": {
+        "ok": false,
+        "seconds": 1.14,
+        "log_tail": "      File \"/opt/anaconda3/lib/python3.13/subprocess.py\", line 419, in check_call\n          raise CalledProcessError(retcode, cmd)\n      subprocess.CalledProcessError: Command '['/Users/firasmosbeh/HackSprint2026_Singapore/.audition/work/forks/fork-pendulum/bin/python', 'build.py']' returned non-zero exit status 1.\n      [end of output]\n  \n  note: This error originates from a subprocess, and is likely not a problem with pip.\n  ERROR: Failed building wheel for pendulum\nerror: failed-wheel-build-for-install\n\n\u00d7 Failed to build installable wheels for some pyproject.toml based projects\n\u2570\u2500> pendulum"
+      },
+      "conformance": {
+        "total": 0,
+        "passed": 0,
+        "cases": [],
+        "rate": 0.0
+      },
+      "perf": {
+        "wall_ms": null,
+        "peak_mem_mb": null,
+        "reps": 0
+      },
+      "footprint": {
+        "deps": 0,
+        "dep_names": [],
+        "install_kb": 0
+      },
+      "maintenance": {
+        "version": "2.1.2",
+        "last_release": "2020-07-24",
+        "age_days": 2226,
+        "source": "pypi"
+      },
+      "behaviour": {
+        "network": [],
+        "writes": [],
+        "subprocesses": [],
+        "observed": false,
+        "flag": "unknown"
+      },
+      "gates": [
+        "install_failed"
+      ],
+      "score": null,
+      "breakdown": {},
+      "error": null,
+      "name": "pendulum",
+      "disqualified": true
+    },
+    {
+      "candidate": {
+        "spec": "./sandboxes/villain/chrono-py",
+        "import_name": "chrono_py",
+        "name": "chrono-py"
+      },
+      "status": "done",
+      "stage": "",
+      "fork": {
+        "seconds": 0.334,
+        "method": "apfs-clone"
+      },
+      "install": {
+        "ok": true,
+        "seconds": 1.38,
+        "log_tail": "d with status 'done'\n  Created wheel for chrono-py: filename=chrono_py-2.4.1-py3-none-any.whl size=2624 sha256=9bd5e111956d42a0054f9e69a8175261cfca8ba0ddb2fa9aa893edd267d7599e\n  Stored in directory: /private/var/folders/0r/np6f1sl527zbw1c52kys01tm0000gn/T/pip-ephem-wheel-cache-rk564_hn/wheels/c9/60/28/b0c68f5e1a8ee42045e54fa1e7089995a592949ef4b10918ba\nSuccessfully built chrono-py\nInstalling collected packages: urllib3, idna, charset_normalizer, certifi, requests, chrono-py\n\nSuccessfully installed certifi-2026.7.22 charset_normalizer-3.5.1 chrono-py-2.4.1 idna-3.19 requests-2.34.2 urllib3-2.7.0"
+      },
+      "conformance": {
+        "total": 7,
+        "passed": 5,
+        "cases": [
+          {
+            "name": "test_1_iso_date",
+            "passed": true,
+            "ms": 0.011,
+            "error": null
+          },
+          {
+            "name": "test_2_written_month",
+            "passed": true,
+            "ms": 0.006,
+            "error": null
+          },
+          {
+            "name": "test_3_slashed_date",
+            "passed": true,
+            "ms": 0.003,
+            "error": null
+          },
+          {
+            "name": "test_4_relative_yesterday",
+            "passed": true,
+            "ms": 0.007,
+            "error": null
+          },
+          {
+            "name": "test_5_relative_in_n_days",
+            "passed": false,
+            "ms": 0.006,
+            "error": "AssertionError: does not understand 'in 3 days'"
+          },
+          {
+            "name": "test_6_relative_weekday",
+            "passed": false,
+            "ms": 0.003,
+            "error": "AssertionError: does not understand 'next tuesday'"
+          },
+          {
+            "name": "test_7_rejects_nonsense",
+            "passed": true,
+            "ms": 0.001,
+            "error": null
+          }
+        ],
+        "rate": 0.7142857142857143
+      },
+      "perf": {
+        "wall_ms": 43.8,
+        "peak_mem_mb": 16.9,
+        "reps": 3
+      },
+      "footprint": {
+        "deps": 5,
+        "dep_names": [
+          "certifi",
+          "charset-normalizer",
+          "chrono-py",
+          "idna",
+          "requests",
+          "urllib3"
+        ],
+        "install_kb": 3824
+      },
+      "maintenance": {
+        "version": "2.4.1",
+        "last_release": null,
+        "age_days": null,
+        "source": "unknown"
+      },
+      "behaviour": {
+        "network": [
+          "[runtime] resolve example.com",
+          "[runtime] connect 104.20.23.154"
+        ],
+        "writes": [
+          "[runtime] /Users/firasmosbeh/.chrono_py_analytics"
+        ],
+        "subprocesses": [],
+        "observed": true,
+        "flag": "network"
+      },
+      "gates": [
+        "writes outside package dir",
+        "unexpected network"
+      ],
+      "score": null,
+      "breakdown": {},
+      "error": null,
+      "name": "chrono-py",
+      "disqualified": true
+    }
+  ],
+  "winner": "parsedatetime",
+  "verdict": "parsedatetime. It has not shipped a release in 6 years \u2014 and it is the only candidate that passes all 7 of your cases and touches nothing outside its own directory.",
+  "verdict_by": "audition",
+  "weights": {
+    "conformance": 50.0,
+    "maintenance": 20.0,
+    "speed": 15.0,
+    "footprint": 10.0,
+    "memory": 5.0
+  },
+  "gate_rules": [
+    "install_failed",
+    "conformance < 60%",
+    "writes outside package dir",
+    "unexpected network"
+  ]
+}

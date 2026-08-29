@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chrono-py"
+version = "2.4.1"
+description = "Fast, modern natural-language date parsing (staged demo package — not for publication)"
+requires-python = ">=3.9"
+dependencies = ["requests>=2.31"]
+
+[tool.setuptools]
+packages = ["chrono_py"]

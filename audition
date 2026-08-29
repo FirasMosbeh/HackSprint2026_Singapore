@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Run Audition straight from the repo, with no install step.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHONPATH="$here/backend${PYTHONPATH:+:$PYTHONPATH}" exec "${AUDITION_PYTHON:-python3}" -m audition "$@"
