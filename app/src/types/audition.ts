@@ -41,7 +41,11 @@ export type TestSuiteStatus =
   | "queued"
   | "running"
   | "passed"
+  /** Ran clean but produced signals worth reviewing. */
+  | "warning"
   | "failed"
+  /** Ran but could not reach a verdict. */
+  | "inconclusive"
   | "skipped"
   | "error";
 

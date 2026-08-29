@@ -1,2 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
 .env
-
+.sentrya-work/
+.testing-workdir/
+node_modules/
+dist/
+*.tsbuildinfo

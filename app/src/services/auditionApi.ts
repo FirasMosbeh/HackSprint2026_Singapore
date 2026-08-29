@@ -9,41 +9,86 @@ import {
  * The only place in the app that knows a backend exists.
  *
  * Components and hooks talk to this module and nothing else, so the real
- * implementation behind it (agent/ + testing/, Daytona, whatever comes next)
- * can change completely without touching the UI.
+ * implementation behind it (agent/ + testing/) can change completely without
+ * touching the UI.
+ *
+ * Mode is decided once, at startup, by probing the agent's health endpoint:
+ *   VITE_DEMO_MODE=true   → always mock
+ *   VITE_DEMO_MODE=false  → always live (errors surface instead of falling back)
+ *   unset                 → live if the agent answers, mock if it does not
  */
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
-const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+const DEMO_FLAG = import.meta.env.VITE_DEMO_MODE;
+const FORCED_DEMO = DEMO_FLAG === "true";
+const FORCED_LIVE = DEMO_FLAG === "false";
 
+const HEALTH_TIMEOUT_MS = 2000;
 
 export interface ApiMode {
   demo: boolean;
-  /** True once a real request has succeeded, false after a failure. */
   connected: boolean;
   reason?: string;
 }
 
-let liveConnected = false;
-let liveReason: string | undefined;
+let demo = FORCED_DEMO;
+let connected = false;
+let reason: string | undefined = FORCED_DEMO
+  ? "Demo mode — results are simulated locally."
+  : undefined;
 
+/** Resolves once the startup probe has settled, so the UI never flickers. */
+let probe: Promise<ApiMode> | null = null;
 
 export function getApiMode(): ApiMode {
-  if (DEMO_MODE) {
-    return {
-      demo: true,
-      connected: true,
-      reason: "Demo mode — results are simulated locally.",
-    };
-  }
-  return { demo: false, connected: liveConnected, reason: liveReason };
+  return { demo, connected: demo ? true : connected, reason };
 }
-
 
 export function isDemoMode(): boolean {
-  return DEMO_MODE;
+  return demo;
 }
 
+/**
+ * Probe the agent once. Safe to call repeatedly — the result is cached.
+ */
+export function detectMode(): Promise<ApiMode> {
+  if (probe) return probe;
+
+  if (FORCED_DEMO) {
+    probe = Promise.resolve(getApiMode());
+    return probe;
+  }
+
+  probe = (async () => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
+      const response = await fetch(`${API_BASE}/api/health`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+
+      demo = false;
+      connected = true;
+      reason = "Live — agent + testing sandboxes.";
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      if (FORCED_LIVE) {
+        demo = false;
+        connected = false;
+        reason = `Agent unreachable: ${detail}`;
+      } else {
+        demo = true;
+        connected = true;
+        reason = "Agent unreachable. Running in demo mode.";
+      }
+    }
+    return getApiMode();
+  })();
+
+  return probe;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}/api${path}`, {
@@ -57,49 +102,62 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function startAudition(req: AuditionRequest): Promise<Audition> {
-  if (isDemoMode()) {
+  await detectMode();
+  if (demo) return createMockAudition(req);
+
+  try {
+    const audition = await request<Audition>("/auditions", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+    connected = true;
+    reason = "Live — agent + testing sandboxes.";
+    return audition;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (FORCED_LIVE) {
+      connected = false;
+      reason = `Agent unreachable: ${detail}`;
+      throw error;
+    }
+    // A backend that dies mid-session must never dead-end the demo.
+    demo = true;
+    connected = true;
+    reason = "Agent unreachable. Running in demo mode.";
     return createMockAudition(req);
   }
-  const audition = await request<Audition>("/auditions", {
-    method: "POST",
-    body: JSON.stringify(req),
-  });
-  liveConnected = true;
-  liveReason = undefined;
-  return audition;
 }
-
 
 export async function getAuditionStatus(
   id: string,
 ): Promise<Pick<Audition, "id" | "status">> {
-    if (isDemoMode()) {
+  if (demo) {
     const audition = getMockAudition(id);
     if (!audition) throw new Error(`Unknown audition ${id}`);
     return { id: audition.id, status: audition.status };
   }
-  const status = await request<Pick<Audition, "id" | "status">>(`/auditions/${id}/status`);
-  liveConnected = true;
-  liveReason = undefined;
-  return status;
-
+  return request<Pick<Audition, "id" | "status">>(`/auditions/${id}/status`);
 }
 
 export async function getAuditionResults(id: string): Promise<Audition> {
-    if (isDemoMode()) {
+  if (demo) {
     const audition = getMockAudition(id);
     if (!audition) throw new Error(`Unknown audition ${id}`);
     return audition;
   }
-  const audition = await request<Audition>(`/auditions/${id}`);
-  liveConnected = true;
-  liveReason = undefined;
-  return audition;
-
+  try {
+    const audition = await request<Audition>(`/auditions/${id}`);
+    connected = true;
+    return audition;
+  } catch (error) {
+    connected = false;
+    reason = error instanceof Error ? error.message : String(error);
+    throw error;
+  }
 }
 
 export async function cancelAudition(id: string): Promise<void> {
-  if (isDemoMode()) {
+  if (demo) {
     cancelMockAudition(id);
     return;
   }

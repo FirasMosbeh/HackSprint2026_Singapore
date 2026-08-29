@@ -42,6 +42,59 @@ These tests are implemented in the `testing/` module. They are predefined by the
 
 The agent is responsible for adapting the tests to each repository.
 
+## Running it
+
+One command starts both halves:
+
+```bash
+./dev.sh
+```
+
+* App — <http://localhost:5173>
+* Agent API — <http://127.0.0.1:8000> (OpenAPI docs at `/docs`)
+
+`dev.sh` creates `.venv`, installs `requirements.txt`, installs the app's npm
+dependencies on first run, then starts the agent and the Vite dev server together.
+
+To run the halves separately:
+
+```bash
+# agent + testing
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+PYTHONPATH=. .venv/bin/python -m uvicorn agent.server:app --port 8000
+
+# app
+cd app && npm install && npm run dev
+```
+
+The app auto-detects the agent. If `/api/health` answers it runs live; if not it
+falls back to a built-in demo mode so the UI is always usable. Force either way with
+`VITE_DEMO_MODE=true|false` in `app/.env`.
+
+## How the parts talk
+
+```text
+app/  ──HTTP──▶  agent/  ──in-process──▶  testing/  ──▶  sandboxes
+ UI              orchestrator             5 suites       one per suite
+```
+
+The app knows four endpoints and nothing else about how an evaluation happens:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | mode detection |
+| `POST` | `/api/auditions` | start a run, returns an `Audition` |
+| `GET` | `/api/auditions/{id}` | full state, including partial results |
+| `GET` | `/api/auditions/{id}/status` | just the status |
+| `DELETE` | `/api/auditions/{id}` | cancel |
+
+The app polls `GET /api/auditions/{id}` while a run is in flight. The orchestrator
+writes each suite into the store the moment it lands, which is what makes results
+appear progressively instead of all at once.
+
+`agent/models.py` and `app/src/types/audition.ts` are the same data model in two
+languages — change one and change the other.
+
 ## Project Structure
 
 ```text

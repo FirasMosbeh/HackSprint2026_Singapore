@@ -11,14 +11,18 @@ This folder contains **only** the web application. The evaluation engine lives i
 
 ## Run it
 
+From the repository root, `./dev.sh` starts the agent and this app together. To run
+just the app:
+
 ```bash
 cd app
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The app ships in demo mode, so it is fully demoable with no
-backend running.
+Open http://localhost:5173. The app probes the agent on startup: if `/api/health`
+answers it runs live against `agent/` + `testing/`, otherwise it falls back to demo
+mode, so it is always usable with or without a backend.
 
 Other scripts: `npm run build`, `npm run preview`, `npm run typecheck`.
 
@@ -28,11 +32,12 @@ Copy `.env.example` to `.env`:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `VITE_DEMO_MODE` | `true` | Run against the built-in mock engine. Set to `false` to use the real backend. |
-| `VITE_API_URL` | `http://localhost:8000` | Base URL of the real backend. Vite proxies `/api` there in dev. |
+| `VITE_DEMO_MODE` | unset | Unset auto-detects. `true` forces the mock engine; `false` forces live and surfaces errors instead of falling back. |
+| `VITE_API_URL` | empty | Leave empty so requests go through the Vite proxy. Set it to talk to an agent on another host. |
+| `VITE_AGENT_URL` | `http://127.0.0.1:8000` | Where the dev-server proxy forwards `/api`. |
 
-If the real backend is unreachable, the app falls back to demo mode and says so in the
-header rather than dead-ending.
+If the agent is unreachable, the app falls back to demo mode and says so in the header
+rather than dead-ending.
 
 ## Integration boundary
 
@@ -50,6 +55,7 @@ Expected HTTP endpoints when `VITE_DEMO_MODE=false`:
 
 | Method | Path | Returns |
 | --- | --- | --- |
+| `GET` | `/api/health` | `{ status }` — used for mode detection |
 | `POST` | `/api/auditions` | `Audition` (status `queued`/`running`) |
 | `GET` | `/api/auditions/:id` | `Audition` with all partial results so far |
 | `GET` | `/api/auditions/:id/status` | `{ id, status }` |
@@ -85,6 +91,11 @@ send each suite as it lands and the columns fill in live. `status: "skipped"` is
 right value when a candidate never installed. The names are a convention, not a
 constraint: `TestSuite.name` is a plain string, so adding a sixth suite needs no
 frontend change.
+
+`status` accepts the app's vocabulary (`queued`, `running`, `passed`, `failed`,
+`skipped`, `error`) plus `warning` and `inconclusive`, which the testing package
+distinguishes: `warning` ran clean but produced signals worth reviewing,
+`inconclusive` ran without reaching a verdict.
 
 The full data model is in [`src/types/audition.ts`](src/types/audition.ts) — that file is
 the contract shared with `agent/` and `testing/`.

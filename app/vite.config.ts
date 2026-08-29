@@ -8,11 +8,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: 5173,
-      // The agent/ and testing/ components expose the real API here.
-      // Requests to /api are proxied so the browser never needs CORS.
+      // The agent (agent/server.py) serves the real API. Proxying /api here
+      // means the browser talks to one origin and never needs CORS.
       proxy: {
         "/api": {
-          target: env.VITE_API_URL || "http://localhost:8000",
+          target: env.VITE_AGENT_URL || "http://127.0.0.1:8000",
           changeOrigin: true,
         },
       },

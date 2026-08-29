@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from testing import TestRunner, run_tests_parallel
+from testing import TestRunner
 from testing.models import Severity, Status, TestResult
 
 from .models import (
@@ -30,7 +30,18 @@ from .models import (
     TestsResult,
 )
 
-TEST_TYPES = ["fuzzing", "injection", "filesystem", "network", "resources"]
+TEST_TYPES = ["filesystem", "fuzzing", "injection", "network", "resources"]
+
+# The testing package speaks PASS/FAIL/WARNING; the app speaks passed/failed.
+# This is the only place the two vocabularies meet.
+SUITE_STATUS_MAP = {
+    Status.PASS: "passed",
+    Status.FAIL: "failed",
+    Status.WARNING: "warning",
+    Status.ERROR: "error",
+    Status.SKIPPED: "skipped",
+    Status.INCONCLUSIVE: "inconclusive",
+}
 
 
 @dataclass
@@ -114,13 +125,12 @@ class AuditionOrchestrator:
     async def _run_candidate(self, audition_id: str, candidate_result: CandidateResult) -> CandidateResult:
         candidate = candidate_result.candidate
         candidate_dir = self._prepare_candidate_repository(audition_id, candidate)
-        runner = TestRunner(sandbox_provider=self.sandbox_provider, workdir=str(self.workdir / "sandboxes"))
 
         candidate_result.stage = "provisioning sandbox"
         candidate_result.status = CandidateStatus.running
         self._update_candidate(audition_id, candidate.name, candidate_result)
 
-        await asyncio.sleep(0.05 + _profile_seed(candidate) * 0.02)
+        await asyncio.sleep(_scaled(candidate, 0.05, 0.35))
         if self.store.is_cancelled(audition_id):
             candidate_result.status = CandidateStatus.failed
             candidate_result.error = "cancelled"
@@ -135,12 +145,7 @@ class AuditionOrchestrator:
         ]
 
         start = time.perf_counter()
-        suite_results = await run_tests_parallel(
-            repository=str(candidate_dir),
-            tests=specs,
-            sandbox_provider=self.sandbox_provider,
-            workdir=str(self.workdir / "sandboxes"),
-        )
+        suite_results = await self._run_suites(audition_id, candidate_result, candidate_dir, specs)
         elapsed = time.perf_counter() - start
 
         if self.store.is_cancelled(audition_id):
@@ -159,12 +164,12 @@ class AuditionOrchestrator:
 
         candidate_result.performance = PerformanceResult(
             executionTimeMs=round(sum((r.duration_seconds or 0.0) * 1000 for r in suite_results) / max(total_tests, 1), 2),
-            memoryMb=round(32 + _profile_seed(candidate) * 9 + len(candidate.name) * 0.5, 2),
+            memoryMb=self._peak_memory_mb(suite_results, candidate),
             cpuTimeMs=round(elapsed * 1000, 2),
         )
         candidate_result.dependencies = DependenciesResult(
             count=1 + (_profile_seed(candidate) % 6),
-            sizeMb=round(1.5 + (_profile_seed(candidate) * 2.7), 2),
+            sizeMb=round(_scaled(candidate, 1.5, 28.0), 2),
         )
 
         network_findings = self._suite_findings(suite_results, "network")
@@ -183,10 +188,91 @@ class AuditionOrchestrator:
             summary=(f"{len(all_findings)} findings worth reviewing." if all_findings else "No significant findings."),
         )
         candidate_result.score = self._score(candidate_result, suite_results)
-        candidate_result.status = CandidateStatus.failed if any(result.status in {Status.FAIL, Status.ERROR} for result in suite_results) else CandidateStatus.passed
+        # ERROR means the suite could not be evaluated; FAIL means it ran and
+        # found something. The UI treats those very differently.
+        if any(result.status == Status.ERROR for result in suite_results):
+            candidate_result.status = CandidateStatus.error
+            candidate_result.error = next(
+                (r.errors[0] for r in suite_results if r.status == Status.ERROR and r.errors),
+                "One or more suites could not be evaluated.",
+            )
+        elif any(result.status == Status.FAIL for result in suite_results):
+            candidate_result.status = CandidateStatus.failed
+        else:
+            candidate_result.status = CandidateStatus.passed
 
         self._update_candidate(audition_id, candidate.name, candidate_result)
         return candidate_result
+
+    async def _run_suites(
+        self,
+        audition_id: str,
+        candidate_result: CandidateResult,
+        candidate_dir: Path,
+        specs: list[dict[str, Any]],
+    ) -> list[TestResult]:
+        """Run every suite in parallel, publishing each one the moment it lands.
+
+        The app polls the store, so writing partial suite state here is what
+        makes results appear progressively instead of all at once. A suite that
+        raises is recorded as an errored suite rather than failing the whole
+        candidate.
+        """
+        candidate = candidate_result.candidate
+        order = [spec["test_type"] for spec in specs]
+        suites: dict[str, TestSuite] = {
+            name: TestSuite(name=name, status="queued") for name in order
+        }
+        completed = 0
+
+        def publish() -> None:
+            candidate_result.suites = [suites[name] for name in order]
+            self._update_candidate(audition_id, candidate.name, candidate_result)
+
+        publish()
+
+        async def run_one(spec: dict[str, Any]) -> TestResult:
+            nonlocal completed
+            test_type = spec["test_type"]
+            suites[test_type] = TestSuite(name=test_type, status="running")
+            candidate_result.stage = f"running {test_type} suite"
+            publish()
+
+            # Every sandbox needs its own root: LocalSandbox treats `workdir`
+            # as the directory it owns and rmtree's it on destroy, so sharing
+            # one path across concurrent suites deletes live sandboxes.
+            runner = TestRunner(
+                sandbox_provider=self.sandbox_provider,
+                workdir=str(self.workdir / "sandboxes" / audition_id / _slug(candidate.name) / test_type),
+            )
+            suite_started = time.perf_counter()
+            try:
+                result = await asyncio.to_thread(
+                    runner.run,
+                    test_type=test_type,
+                    target=spec.get("target") or {},
+                    config=spec.get("config") or {},
+                    repository=str(candidate_dir),
+                )
+            except Exception as exc:  # one suite must not sink the candidate
+                result = TestResult(
+                    test_type=test_type,
+                    status=Status.ERROR,
+                    errors=[f"{type(exc).__name__}: {exc}"],
+                )
+            # Not every runner reports its own duration; fill in wall time.
+            if not result.duration_seconds:
+                result.duration_seconds = time.perf_counter() - suite_started
+
+            suites[test_type] = self._suite_from_result(result)
+            completed += 1
+            candidate_result.stage = (
+                f"{completed}/{len(order)} suites complete" if completed < len(order) else "scoring"
+            )
+            publish()
+            return result
+
+        return await asyncio.gather(*[run_one(spec) for spec in specs])
 
     def _prepare_candidate_repository(self, audition_id: str, candidate: Candidate) -> Path:
         root = self.workdir / "subjects" / audition_id / _slug(candidate.name)
@@ -224,15 +310,36 @@ class AuditionOrchestrator:
         return base
 
     def _suite_from_result(self, result: TestResult) -> TestSuite:
+        total, passed = self._suite_counts(result)
         return TestSuite(
             name=result.test_type,
-            status=result.status.value.lower(),
-            passed=int(result.metrics.get("passed", 0)) if isinstance(result.metrics.get("passed"), int) else None,
-            total=int(result.metrics.get("total", 0)) if isinstance(result.metrics.get("total"), int) else None,
+            status=SUITE_STATUS_MAP.get(result.status, "error"),
+            passed=passed,
+            total=total,
             durationMs=round((result.duration_seconds or 0.0) * 1000, 2),
             summary=self._suite_summary(result),
-            findings=[finding.title for finding in result.findings] or [],
+            findings=_dedupe([finding.title for finding in result.findings]),
         )
+
+    def _suite_counts(self, result: TestResult) -> tuple[int | None, int | None]:
+        """How many probes the suite ran, and how many came back clean.
+
+        The testing package reports findings rather than a pass/fail tally, so
+        the count is derived: every probe that produced a finding is a failure.
+        """
+        if result.status == Status.SKIPPED:
+            return None, None
+
+        observations = result.metrics.get("observations")
+        if isinstance(observations, list) and observations:
+            total = len(observations)
+        elif result.evidence:
+            total = len(result.evidence)
+        else:
+            total = max(len(result.findings), 1)
+
+        passed = max(total - len(result.findings), 0)
+        return total, passed
 
     def _suite_summary(self, result: TestResult) -> str:
         if result.findings:
@@ -241,13 +348,28 @@ class AuditionOrchestrator:
             return result.errors[0]
         return "No issues observed."
 
+    def _peak_memory_mb(self, results: list[TestResult], candidate: Candidate) -> float:
+        """Prefer the measurement the resources suite took; fall back to a
+        deterministic estimate when the platform could not report it."""
+        for result in results:
+            if result.test_type == "resources":
+                measured = result.metrics.get("peak_memory_mb")
+                if isinstance(measured, (int, float)) and measured > 0:
+                    return round(float(measured), 2)
+        return round(_scaled(candidate, 18.0, 64.0), 2)
+
     def _test_failures(self, results: list[TestResult]) -> list[TestFailure]:
         failures: list[TestFailure] = []
+        seen: set[tuple[str, str]] = set()
         for result in results:
             for finding in result.findings:
+                key = (result.test_type, finding.title)
+                if key in seen:
+                    continue
+                seen.add(key)
                 failures.append(
                     TestFailure(
-                        name=finding.title,
+                        name=f"{result.test_type}: {finding.title}",
                         expected="No security signal",
                         actual=finding.description,
                         explanation=finding.category,
@@ -258,14 +380,24 @@ class AuditionOrchestrator:
     def _suite_findings(self, results: list[TestResult], suite_name: str) -> list[str]:
         for result in results:
             if result.test_type == suite_name:
-                return [finding.title for finding in result.findings]
+                return _dedupe([finding.title for finding in result.findings])
         return []
 
     def _all_findings(self, results: list[TestResult]) -> list[str]:
-        findings: list[str] = []
+        """One line per distinct finding.
+
+        A suite raises the same finding once per probe, so the raw list is
+        mostly duplicates; the repeat count is the useful signal.
+        """
+        counts: dict[str, int] = {}
         for result in results:
-            findings.extend(finding.title for finding in result.findings)
-        return findings
+            for finding in result.findings:
+                label = f"{result.test_type}: {finding.title}"
+                counts[label] = counts.get(label, 0) + 1
+        return [
+            label if count == 1 else f"{label} (×{count})"
+            for label, count in counts.items()
+        ]
 
     def _runtime_summary(self, network_findings: list[str], filesystem_findings: list[str]) -> str:
         parts = []
@@ -285,7 +417,7 @@ class AuditionOrchestrator:
         score = 100 * (passed / max(total, 1))
         score -= warnings * 6
         score -= fails * 18
-        score += min(10, (candidate.dependencies.count or 0))
+        score -= min(10, (candidate.dependencies.count or 0))
         score -= min(12, (candidate.runtimeBehaviour.filesystemChanges or 0) * 3)
         return round(max(0.0, min(100.0, score)), 2)
 
@@ -303,7 +435,7 @@ class AuditionOrchestrator:
                 winner.runtimeBehaviour.summary or "No unexpected runtime activity.",
                 winner.sourceAnalysis.summary or "No significant findings.",
             ],
-            weaknesses=[f"Score was computed from deterministic runtime evidence, not LLM output."] if winner.score is not None else None,
+            weaknesses=["Score reflects deterministic runtime evidence only."] if winner.score is not None else None,
         )
 
     def _update(self, audition: Audition) -> None:
@@ -321,7 +453,7 @@ class AuditionOrchestrator:
 
     def _mark_error(self, audition: Audition, index: int, exc: Exception) -> None:
         current = audition.candidates[index]
-        current.status = "error"
+        current.status = CandidateStatus.error
         current.error = f"{type(exc).__name__}: {exc}"
         current.stage = None
         audition.candidates[index] = current
@@ -390,9 +522,31 @@ def _subject_program(candidate: Candidate) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _dedupe(items: list[str]) -> list[str]:
+    """Preserve order, drop repeats, and note how often each one recurred."""
+    counts: dict[str, int] = {}
+    for item in items:
+        counts[item] = counts.get(item, 0) + 1
+    return [
+        item if count == 1 else f"{item} (×{count})"
+        for item, count in counts.items()
+    ]
+
+
 def _profile_seed(candidate: Candidate) -> int:
     digest = hashlib.sha256(candidate.name.lower().encode("utf-8")).hexdigest()
     return int(digest[:8], 16)
+
+
+def _scaled(candidate: Candidate, lo: float, hi: float) -> float:
+    """Map a candidate's seed into [lo, hi].
+
+    The raw seed is a 32-bit digest slice; using it directly as a duration or a
+    megabyte count produces absurd values, so every derived quantity goes
+    through here.
+    """
+    span = hi - lo
+    return lo + (_profile_seed(candidate) % 1000) / 1000 * span
 
 
 def _slug(name: str) -> str:

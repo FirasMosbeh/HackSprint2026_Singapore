@@ -3,6 +3,7 @@ import type { Audition, AuditionRequest } from "../types/audition";
 import { isTerminal } from "../types/audition";
 import {
   cancelAudition,
+  detectMode,
   getApiMode,
   getAuditionResults,
   startAudition,
@@ -44,6 +45,18 @@ export function useAudition(): UseAudition {
   }, []);
 
   useEffect(() => stopPolling, [stopPolling]);
+
+  // Probe the agent once on mount so the header shows the real mode before
+  // the user starts anything.
+  useEffect(() => {
+    let alive = true;
+    void detectMode().then((next) => {
+      if (alive) setMode(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const poll = useCallback(
     async (id: string) => {

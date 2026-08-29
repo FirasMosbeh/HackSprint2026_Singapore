@@ -4,7 +4,9 @@ const GLYPHS: Record<TestSuite["status"], string> = {
   queued: "○",
   running: "●",
   passed: "✓",
+  warning: "!",
   failed: "✗",
+  inconclusive: "?",
   skipped: "–",
   error: "⚠",
 };

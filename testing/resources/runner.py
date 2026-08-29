@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import time
 from typing import Any
 
@@ -127,7 +128,8 @@ def _estimate_metrics(sandbox, runtime_seconds: float, stdout: str, stderr: str)
 
         usage = resource.getrusage(resource.RUSAGE_SELF)
         peak = usage.ru_maxrss
-        peak_mb = peak / 1024 if peak > 1024 * 1024 else peak / 1024
+        # ru_maxrss is bytes on macOS/BSD and kilobytes on Linux.
+        peak_mb = peak / (1024 * 1024) if sys.platform == "darwin" else peak / 1024
         metrics["peak_memory_mb"] = round(peak_mb, 2)
     except Exception:
         metrics["peak_memory_mb"] = None
