@@ -85,6 +85,10 @@ class LocalMachine:
         except OSError:
             return ""
 
+    def materialise(self, local_path: str) -> str:
+        """A local machine can already see the host filesystem."""
+        return str(Path(local_path).resolve())
+
     def write_text(self, path: str, content: str) -> None:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)

@@ -122,7 +122,7 @@ def _print_config() -> int:
         mark = " " if status == "not set" else "+"
         print(f"   {mark} {key:<18} {status:<22} {note}")
 
-    kimi = os.environ.get("KIMI_API_KEY") or os.environ.get("MOONSHOT_API_KEY")
+    kimi = config.kimi_api_key()
     try:
         import daytona  # noqa: F401
         sdk = "installed"
@@ -204,8 +204,11 @@ def _run(args) -> int:
     forks = [r for r in rep.candidates if r.fork.method]
     if forks:
         method = forks[0].fork.method
-        total = sum(r.fork.seconds for r in forks)
-        print(f"  {len(forks)} forks ({method}) in {total:.2f}s · whole run {elapsed:.1f}s\n")
+        # Forks run in parallel, so the slowest one is the wall cost; summing
+        # them would report time that was never actually spent waiting.
+        slowest = max(r.fork.seconds for r in forks)
+        print(f"  {len(forks)} forks ({method}), slowest {slowest:.2f}s "
+              f"· whole run {elapsed:.1f}s\n")
 
     if args.save:
         reporting.write_json(rep, Path(args.save))

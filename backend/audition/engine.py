@@ -112,10 +112,11 @@ class Engine:
         self._stage("install", result)
 
         paths = self._stage_files(machine)
+        spec = self._materialise(machine, candidate)
 
         install = machine.run(
             [machine.python(), "-m", "pip", "install", "--no-input",
-             "--disable-pip-version-check", candidate.spec],
+             "--disable-pip-version-check", spec],
             env=self._hook_env(machine, paths, "install"),
             timeout=INSTALL_TIMEOUT,
         )
@@ -154,8 +155,13 @@ class Engine:
                 result.error = _tail(res.stderr or res.stdout) or "conformance runner produced no result"
                 continue
             payload = payload or parsed
-            ms = res.seconds * 1000
-            best_ms = ms if best_ms is None else min(best_ms, ms)
+            # Measured inside the machine, not across the transport. A remote
+            # provider's API round-trip is latency we introduced, not a cost
+            # the library imposes, and including it would make local and
+            # sandbox numbers incomparable.
+            ms = _measured_ms(parsed)
+            if ms is not None:
+                best_ms = ms if best_ms is None else min(best_ms, ms)
             mem = parsed.get("peak_mem_mb")
             if isinstance(mem, (int, float)):
                 best_mem = mem if best_mem is None else min(best_mem, mem)
@@ -184,6 +190,15 @@ class Engine:
         self._stage("", result)
 
     # -- helpers -----------------------------------------------------------
+
+    def _materialise(self, machine, candidate: Candidate) -> str:
+        """Local-path candidates have to exist inside the machine before pip
+        can install them; PyPI names are passed through untouched."""
+        local = Path(candidate.spec)
+        if not (candidate.spec.startswith((".", "/")) or local.exists()):
+            return candidate.spec
+        materialise = getattr(machine, "materialise", None)
+        return materialise(str(local)) if callable(materialise) else candidate.spec
 
     def _stage_files(self, machine) -> dict[str, str]:
         root = f"{_machine_root(machine)}/_audition"
@@ -292,6 +307,14 @@ def _extract(stdout: str) -> dict | None:
         return json.loads(stdout[start + len(BEGIN):end])
     except json.JSONDecodeError:
         return None
+
+
+def _measured_ms(payload: dict) -> float | None:
+    """Import cost plus every case, as timed by the interpreter running them."""
+    if not payload.get("import_ok"):
+        return None
+    cases = payload.get("cases") or []
+    return float(payload.get("import_ms") or 0.0) + sum(float(c.get("ms") or 0.0) for c in cases)
 
 
 def _conformance(payload: dict) -> ConformanceInfo:

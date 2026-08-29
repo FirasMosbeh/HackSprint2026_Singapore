@@ -20,8 +20,7 @@ import urllib.request
 
 from .models import TestSuiteInfo
 
-DEFAULT_BASE_URL = os.environ.get("KIMI_BASE_URL", "https://api.moonshot.ai/v1")
-DEFAULT_MODEL = os.environ.get("KIMI_MODEL", "kimi-k2-turbo-preview")
+from . import config
 
 SYSTEM_PROMPT = """You write conformance test suites that decide whether a Python library \
 satisfies a user's stated requirement.
@@ -62,14 +61,14 @@ def generate(
     use_model: bool = True,
 ) -> tuple[str, TestSuiteInfo]:
     """Return (source, info). Falls back to the offline generator on any failure."""
-    api_key = os.environ.get("KIMI_API_KEY") or os.environ.get("MOONSHOT_API_KEY")
+    api_key = config.kimi_api_key()
     if use_model and api_key:
         try:
             source = _generate_with_kimi(requirement, candidates, api_key)
             names = _validate(source)
             return source, TestSuiteInfo(
                 generated_by="kimi",
-                model=DEFAULT_MODEL,
+                model=config.kimi_model(),
                 n_cases=len(names),
                 source=source,
                 case_names=names,
@@ -118,13 +117,13 @@ def _generate_with_kimi(requirement: str, candidates: list[str], api_key: str) -
 
 def _chat(messages: list[dict], api_key: str) -> str:
     payload = json.dumps({
-        "model": DEFAULT_MODEL,
+        "model": config.kimi_model(),
         "messages": messages,
         "temperature": 0.2,
         "max_tokens": 2400,
     }).encode()
     req = urllib.request.Request(
-        f"{DEFAULT_BASE_URL.rstrip('/')}/chat/completions",
+        f"{config.kimi_base_url()}/chat/completions",
         data=payload,
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
         method="POST",

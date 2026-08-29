@@ -17,12 +17,29 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_FILE = REPO_ROOT / ".env"
 
+# Moonshot retires preview model ids fairly often. `audition config` lists what
+# your key can actually see, so a 404 here is a one-line fix rather than a hunt.
+DEFAULT_KIMI_MODEL = "kimi-k2.6"
+DEFAULT_KIMI_BASE_URL = "https://api.moonshot.ai/v1"
+
+
+def kimi_api_key() -> str | None:
+    return os.environ.get("KIMI_API_KEY") or os.environ.get("MOONSHOT_API_KEY")
+
+
+def kimi_model() -> str:
+    return os.environ.get("KIMI_MODEL") or DEFAULT_KIMI_MODEL
+
+
+def kimi_base_url() -> str:
+    return (os.environ.get("KIMI_BASE_URL") or DEFAULT_KIMI_BASE_URL).rstrip("/")
+
 # Reported by `audition config` so it is obvious what is wired up and what is not.
 KNOWN_KEYS = (
     ("KIMI_API_KEY", "Kimi writes the conformance suite and the closing sentence"),
     ("MOONSHOT_API_KEY", "alias for KIMI_API_KEY"),
-    ("KIMI_MODEL", "default kimi-k2-turbo-preview"),
-    ("KIMI_BASE_URL", "default https://api.moonshot.ai/v1"),
+    ("KIMI_MODEL", f"default {DEFAULT_KIMI_MODEL}"),
+    ("KIMI_BASE_URL", f"default {DEFAULT_KIMI_BASE_URL}"),
     ("DAYTONA_API_KEY", "required for --provider daytona"),
     ("DAYTONA_API_URL", "override the Daytona control-plane URL"),
     ("DAYTONA_TARGET", "Daytona region/target, e.g. eu or us"),

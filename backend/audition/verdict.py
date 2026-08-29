@@ -13,6 +13,7 @@ import os
 import urllib.error
 import urllib.request
 
+from . import config
 from .models import Report
 
 MEANINGFUL_SLOWDOWN = 1.25
@@ -32,7 +33,7 @@ def write(report: Report) -> tuple[str, str]:
         return _no_winner(report), "audition"
 
     facts = _facts(report)
-    api_key = os.environ.get("KIMI_API_KEY") or os.environ.get("MOONSHOT_API_KEY")
+    api_key = config.kimi_api_key()
     if api_key:
         try:
             return _ask_kimi(report, facts, api_key), "kimi"
@@ -59,9 +60,9 @@ def _facts(report: Report) -> str:
 
 
 def _ask_kimi(report: Report, facts: str, api_key: str) -> str:
-    base = os.environ.get("KIMI_BASE_URL", "https://api.moonshot.ai/v1").rstrip("/")
+    base = config.kimi_base_url()
     payload = json.dumps({
-        "model": os.environ.get("KIMI_MODEL", "kimi-k2-turbo-preview"),
+        "model": config.kimi_model(),
         "messages": [
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": facts},

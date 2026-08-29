@@ -64,6 +64,12 @@ if _LOG_PATH:
             real = os.path.realpath(str(path))
         except Exception:
             return True
+        # CPython writes .pyc files for any module it imports, including the
+        # standard library, on first import in a fresh machine. That is the
+        # interpreter caching bytecode, not the package reaching outside its
+        # directory, and reporting it would be a false accusation.
+        if "__pycache__" in real or ".pyc" in real:
+            return True
         return real.startswith(_SAFE_PREFIXES) if _SAFE_PREFIXES else False
 
     def _wants_write(mode, flags):

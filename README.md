@@ -198,7 +198,7 @@ KIMI_MODEL=kimi-k2-0905-preview ./audition run ...
 | Variable | Needed for | Where to get it |
 | -------- | ---------- | --------------- |
 | `KIMI_API_KEY` | Kimi writes the conformance suite and the closing sentence | [platform.moonshot.ai](https://platform.moonshot.ai/console/api-keys) |
-| `KIMI_MODEL`, `KIMI_BASE_URL` | overriding the model or the endpoint | optional; defaults to `kimi-k2-turbo-preview` |
+| `KIMI_MODEL`, `KIMI_BASE_URL` | overriding the model or the endpoint | optional; defaults to `kimi-k2.6` |
 | `DAYTONA_API_KEY` | `--provider daytona` | [app.daytona.io](https://app.daytona.io) → Dashboard → Keys |
 | `DAYTONA_TARGET`, `DAYTONA_API_URL` | non-default region or control plane | optional; only if your dashboard shows one |
 
@@ -207,17 +207,38 @@ KIMI_MODEL=kimi-k2-0905-preview ./audition run ...
 ```bash
 pip install daytona          # the SDK is an optional extra, not a dependency
 echo "DAYTONA_API_KEY=dtn_..." >> .env
-./audition config            # confirm: "daytona available"
+./audition config            # confirm: "daytona SDK: installed"
 ./audition run "..." --candidates dateparser,arrow --provider daytona
 ```
 
-The Daytona provider implements the same two operations as the local one
-(`prepare_base` and `fork`), so nothing above it changes. Its SDK calls are
-capability-probed rather than assumed, because the SDK surface has moved
-between versions — if your version exposes neither `sandbox.fork()` nor
-snapshot creation, it says so and names the method it wanted. **This path has
-not been exercised against a live API key**; the local provider is the default
-and is what the demo depends on.
+Verified end to end against the Daytona API (SDK 0.207): sandbox creation,
+`process.exec`, filesystem upload of local candidates, the audit hook, and
+teardown all work, and the staged villain is caught on both hard gates inside a
+real sandbox.
+
+**One caveat.** `sandbox.fork()` is gated per account, and on ours the server
+answers *"Forking is not supported for this sandbox"* — in every configuration
+(running, stopped, snapshot-built, image-built). When that happens Audition
+says so and falls back to **snapshot restore**: the prepared base is snapshotted
+once and every candidate is restored from that same frozen image.
+
+That preserves the property the comparison depends on — every candidate starts
+from a byte-identical base — but not the cheapness: a fork is instant, whereas a
+restore is paid per candidate (~60s each, in parallel). The method used is
+printed under the table, so a number is never presented as more rigorous than
+the machine it came from. If your account has forking enabled it is used
+automatically, with no flag to set.
+
+Sandboxes and the base snapshot are deleted on the way out, including when a run
+fails, so nothing keeps billing after the demo.
+
+### Why speed is measured inside the machine
+
+The timed reps report the interpreter's own measurement — import cost plus every
+case — not the wall time the host observed. Over the Daytona API a round-trip
+adds ~250 ms of latency that Audition introduced and the library never charged
+you. Measuring inside the machine keeps the local and sandbox columns directly
+comparable: `parsedatetime` reports 9 ms locally and 10 ms on Daytona.
 
 ## Roadmap
 

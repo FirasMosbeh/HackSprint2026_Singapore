@@ -2,10 +2,10 @@
   "requirement": "parse human-written dates like 'next tuesday' into a datetime",
   "python": "3.13.5",
   "provider": "local-fork",
-  "started_at": "2026-08-29T05:43:19+00:00",
-  "finished_at": "2026-08-29T05:43:25+00:00",
+  "started_at": "2026-08-29T06:17:45+00:00",
+  "finished_at": "2026-08-29T06:17:51+00:00",
   "status": "done",
-  "base_prepared_seconds": 2.3,
+  "base_prepared_seconds": 0.01,
   "suite": {
     "generated_by": "offline-fallback",
     "model": null,
@@ -31,12 +31,12 @@
       "status": "done",
       "stage": "",
       "fork": {
-        "seconds": 0.326,
+        "seconds": 0.413,
         "method": "apfs-clone"
       },
       "install": {
         "ok": true,
-        "seconds": 0.89,
+        "seconds": 1.2,
         "log_tail": "whl.metadata (1.7 kB)\nUsing cached dateparser-1.4.2-py3-none-any.whl (316 kB)\nUsing cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)\nUsing cached pytz-2026.3.post1-py2.py3-none-any.whl (508 kB)\nUsing cached regex-2026.7.19-cp313-cp313-macosx_11_0_arm64.whl (291 kB)\nUsing cached six-1.17.0-py2.py3-none-any.whl (11 kB)\nUsing cached tzlocal-5.4.4-py3-none-any.whl (18 kB)\nInstalling collected packages: pytz, tzlocal, six, regex, python-dateutil, dateparser\n\nSuccessfully installed dateparser-1.4.2 python-dateutil-2.9.0.post0 pytz-2026.3.post1 regex-2026.7.19 six-1.17.0 tzlocal-5.4.4"
       },
       "conformance": {
@@ -46,51 +46,51 @@
           {
             "name": "test_1_iso_date",
             "passed": true,
-            "ms": 24.821,
+            "ms": 24.428,
             "error": null
           },
           {
             "name": "test_2_written_month",
             "passed": true,
-            "ms": 0.952,
+            "ms": 0.984,
             "error": null
           },
           {
             "name": "test_3_slashed_date",
             "passed": true,
-            "ms": 0.497,
+            "ms": 0.546,
             "error": null
           },
           {
             "name": "test_4_relative_yesterday",
             "passed": true,
-            "ms": 0.472,
+            "ms": 0.512,
             "error": null
           },
           {
             "name": "test_5_relative_in_n_days",
             "passed": true,
-            "ms": 0.384,
+            "ms": 0.423,
             "error": null
           },
           {
             "name": "test_6_relative_weekday",
             "passed": false,
-            "ms": 521.345,
+            "ms": 579.499,
             "error": "AssertionError: does not understand 'next tuesday'"
           },
           {
             "name": "test_7_rejects_nonsense",
             "passed": true,
-            "ms": 4.974,
+            "ms": 5.199,
             "error": null
           }
         ],
         "rate": 0.8571428571428571
       },
       "perf": {
-        "wall_ms": 639.8,
-        "peak_mem_mb": 63.5,
+        "wall_ms": 663.0,
+        "peak_mem_mb": 63.9,
         "reps": 3
       },
       "footprint": {
@@ -140,12 +140,12 @@
       "status": "done",
       "stage": "",
       "fork": {
-        "seconds": 0.324,
+        "seconds": 0.447,
         "method": "apfs-clone"
       },
       "install": {
         "ok": true,
-        "seconds": 0.5,
+        "seconds": 0.56,
         "log_tail": "ing tzdata (from arrow)\n  Using cached tzdata-2026.3-py2.py3-none-any.whl.metadata (1.4 kB)\nCollecting six>=1.5 (from python-dateutil>=2.7.0->arrow)\n  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)\nUsing cached arrow-1.4.0-py3-none-any.whl (68 kB)\nUsing cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)\nUsing cached six-1.17.0-py2.py3-none-any.whl (11 kB)\nUsing cached tzdata-2026.3-py2.py3-none-any.whl (348 kB)\nInstalling collected packages: tzdata, six, python-dateutil, arrow\n\nSuccessfully installed arrow-1.4.0 python-dateutil-2.9.0.post0 six-1.17.0 tzdata-2026.3"
       },
       "conformance": {
@@ -155,37 +155,37 @@
           {
             "name": "test_1_iso_date",
             "passed": true,
-            "ms": 0.451,
+            "ms": 0.473,
             "error": null
           },
           {
             "name": "test_2_written_month",
             "passed": false,
-            "ms": 0.017,
+            "ms": 0.018,
             "error": "ParserError: Expected an ISO 8601-like string, but was given 'March 5, 2026'. Try passing in a format string to resolve this."
           },
           {
             "name": "test_3_slashed_date",
             "passed": true,
-            "ms": 0.279,
+            "ms": 0.281,
             "error": null
           },
           {
             "name": "test_4_relative_yesterday",
             "passed": false,
-            "ms": 0.986,
+            "ms": 1.053,
             "error": "ParserError: Could not match input 'yesterday' to any of the following formats: YYYY-MM-DD, YYYY-M-DD, YYYY-M-D, YYYY/MM/DD, YYYY/M/DD, YYYY/M/D, YYYY.MM.DD, YYYY.M.DD, YYYY.M.D, YYYYMMDD, YYYY-DDDD, YYYYDDDD, YYYY-MM, YYYY/MM, YYYY.MM, YYYY, W."
           },
           {
             "name": "test_5_relative_in_n_days",
             "passed": false,
-            "ms": 0.01,
+            "ms": 0.014,
             "error": "ParserError: Expected an ISO 8601-like string, but was given 'in 3 days'. Try passing in a format string to resolve this."
           },
           {
             "name": "test_6_relative_weekday",
             "passed": false,
-            "ms": 0.025,
+            "ms": 0.028,
             "error": "ParserError: Invalid time component provided. Please specify a format or provide a valid time component in the basic or extended ISO 8601 time format."
           },
           {
@@ -198,8 +198,8 @@
         "rate": 0.42857142857142855
       },
       "perf": {
-        "wall_ms": 36.7,
-        "peak_mem_mb": 17.2,
+        "wall_ms": 23.1,
+        "peak_mem_mb": 17.3,
         "reps": 3
       },
       "footprint": {
@@ -243,12 +243,12 @@
       "status": "done",
       "stage": "",
       "fork": {
-        "seconds": 0.323,
+        "seconds": 0.471,
         "method": "apfs-clone"
       },
       "install": {
         "ok": true,
-        "seconds": 0.31,
+        "seconds": 0.4,
         "log_tail": "Collecting parsedatetime\n  Using cached parsedatetime-2.6-py3-none-any.whl.metadata (4.7 kB)\nUsing cached parsedatetime-2.6-py3-none-any.whl (42 kB)\nInstalling collected packages: parsedatetime\nSuccessfully installed parsedatetime-2.6"
       },
       "conformance": {
@@ -258,51 +258,51 @@
           {
             "name": "test_1_iso_date",
             "passed": true,
-            "ms": 1.245,
+            "ms": 1.579,
             "error": null
           },
           {
             "name": "test_2_written_month",
             "passed": true,
-            "ms": 0.302,
+            "ms": 0.163,
             "error": null
           },
           {
             "name": "test_3_slashed_date",
             "passed": true,
-            "ms": 0.128,
+            "ms": 0.114,
             "error": null
           },
           {
             "name": "test_4_relative_yesterday",
             "passed": true,
-            "ms": 0.166,
+            "ms": 0.188,
             "error": null
           },
           {
             "name": "test_5_relative_in_n_days",
             "passed": true,
-            "ms": 0.557,
+            "ms": 0.564,
             "error": null
           },
           {
             "name": "test_6_relative_weekday",
             "passed": true,
-            "ms": 0.131,
+            "ms": 0.118,
             "error": null
           },
           {
             "name": "test_7_rejects_nonsense",
             "passed": true,
-            "ms": 0.101,
+            "ms": 0.103,
             "error": null
           }
         ],
         "rate": 1.0
       },
       "perf": {
-        "wall_ms": 34.4,
-        "peak_mem_mb": 14.7,
+        "wall_ms": 9.9,
+        "peak_mem_mb": 14.6,
         "reps": 3
       },
       "footprint": {
@@ -347,12 +347,12 @@
       "status": "done",
       "stage": "",
       "fork": {
-        "seconds": 0.335,
+        "seconds": 0.452,
         "method": "apfs-clone"
       },
       "install": {
         "ok": false,
-        "seconds": 1.14,
+        "seconds": 1.63,
         "log_tail": "      File \"/opt/anaconda3/lib/python3.13/subprocess.py\", line 419, in check_call\n          raise CalledProcessError(retcode, cmd)\n      subprocess.CalledProcessError: Command '['/Users/firasmosbeh/HackSprint2026_Singapore/.audition/work/forks/fork-pendulum/bin/python', 'build.py']' returned non-zero exit status 1.\n      [end of output]\n  \n  note: This error originates from a subprocess, and is likely not a problem with pip.\n  ERROR: Failed building wheel for pendulum\nerror: failed-wheel-build-for-install\n\n\u00d7 Failed to build installable wheels for some pyproject.toml based projects\n\u2570\u2500> pendulum"
       },
       "conformance": {
@@ -402,13 +402,13 @@
       "status": "done",
       "stage": "",
       "fork": {
-        "seconds": 0.334,
+        "seconds": 0.446,
         "method": "apfs-clone"
       },
       "install": {
         "ok": true,
-        "seconds": 1.38,
-        "log_tail": "d with status 'done'\n  Created wheel for chrono-py: filename=chrono_py-2.4.1-py3-none-any.whl size=2624 sha256=9bd5e111956d42a0054f9e69a8175261cfca8ba0ddb2fa9aa893edd267d7599e\n  Stored in directory: /private/var/folders/0r/np6f1sl527zbw1c52kys01tm0000gn/T/pip-ephem-wheel-cache-rk564_hn/wheels/c9/60/28/b0c68f5e1a8ee42045e54fa1e7089995a592949ef4b10918ba\nSuccessfully built chrono-py\nInstalling collected packages: urllib3, idna, charset_normalizer, certifi, requests, chrono-py\n\nSuccessfully installed certifi-2026.7.22 charset_normalizer-3.5.1 chrono-py-2.4.1 idna-3.19 requests-2.34.2 urllib3-2.7.0"
+        "seconds": 1.68,
+        "log_tail": "d with status 'done'\n  Created wheel for chrono-py: filename=chrono_py-2.4.1-py3-none-any.whl size=2624 sha256=18bf468a839cb55e150fd592935b500d2bbd700b32774cdfd741c6e27163253c\n  Stored in directory: /private/var/folders/0r/np6f1sl527zbw1c52kys01tm0000gn/T/pip-ephem-wheel-cache-93krfpnj/wheels/c9/60/28/b0c68f5e1a8ee42045e54fa1e7089995a592949ef4b10918ba\nSuccessfully built chrono-py\nInstalling collected packages: urllib3, idna, charset_normalizer, certifi, requests, chrono-py\n\nSuccessfully installed certifi-2026.7.22 charset_normalizer-3.5.1 chrono-py-2.4.1 idna-3.19 requests-2.34.2 urllib3-2.7.0"
       },
       "conformance": {
         "total": 7,
@@ -453,15 +453,15 @@
           {
             "name": "test_7_rejects_nonsense",
             "passed": true,
-            "ms": 0.001,
+            "ms": 0.002,
             "error": null
           }
         ],
         "rate": 0.7142857142857143
       },
       "perf": {
-        "wall_ms": 43.8,
-        "peak_mem_mb": 16.9,
+        "wall_ms": 30.5,
+        "peak_mem_mb": 17.5,
         "reps": 3
       },
       "footprint": {
