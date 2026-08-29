@@ -36,30 +36,6 @@ def repo_search(app_description: str) -> list[str]:
         return next(iter(data.values()))
     return data
 
-def search_repo_in_daytona(queries: list[str]) -> str:
-    """Provisions a Daytona sandbox to execute search queries against GitHub API."""
-    
-    print("Creating Daytona sandbox container...")
-    # daytona.create() retourne une instance de Sandbox [1]
-    sandbox = daytona.create(CreateSandboxFromSnapshotParams(
-        env_vars={"DEBUG": "true", "LOG_LEVEL": "info"},
-    ))
-    
-    try:
-        query_str = "+".join(queries.split())
-        cmd = f'curl -s "https://api.github.com/search/repositories?q={query_str}&sort=stars&order=desc" | grep -E "\\"full_name\\"|\\"html_url\\"|\\"stargazers_count\\"|\\"description\\"" | head -n 4'
-        
-        print(f"Executing search in Daytona for query: '{queries}'")
-        # Utilisation de sandbox.process.exec pour exécuter la commande [2]
-        execution = sandbox.process.exec(cmd)
-        
-        # Le résultat textuel est récupéré dans l'attribut .result [3]
-        return execution.result
-    finally:
-        print("Cleaning up Daytona sandbox...")
-        # Suppression de la sandbox pour libérer les ressources [4]
-        sandbox.delete()
-
 
 def main():
     description = "An open-source self-hosted Notion alternative with markdown support and kanban boards"
@@ -70,11 +46,5 @@ def main():
     print(f"Generated Queries: {queries}")
 
     
-    # if queries:
-    #     print("\n2. Executing repository lookup in Daytona...")
-    #     repo_info = search_repo_in_daytona(queries)
-    #     print("\n--- Best Matching Repository ---")
-    #     print(repo_info)
-
 if __name__ == "__main__":
     main()
