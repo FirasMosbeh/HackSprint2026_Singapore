@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import shutil
 import tempfile
 import time
@@ -67,9 +68,14 @@ class AuditionStore:
 
 
 class AuditionOrchestrator:
-    def __init__(self, *, workdir: str | None = None, sandbox_provider: str = "local") -> None:
-        self.workdir = Path(workdir or tempfile.mkdtemp(prefix="sentrya-agent-"))
-        self.sandbox_provider = sandbox_provider
+    def __init__(self, *, workdir: str | None = None, sandbox_provider: str | None = None) -> None:
+        self.workdir = Path(
+            workdir or os.environ.get("TESTING_WORKDIR") or tempfile.mkdtemp(prefix="sentrya-agent-")
+        )
+        # One switch decides where every suite runs. Nothing downstream cares.
+        self.sandbox_provider = (
+            sandbox_provider or os.environ.get("TESTING_SANDBOX_PROVIDER") or "local"
+        )
         self.store = AuditionStore()
 
     def create_audition(self, requirement: str, candidates: list[Candidate]) -> Audition:
