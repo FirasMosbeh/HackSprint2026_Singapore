@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
+from . import config
 from . import report as reporting
 from . import testgen
 from .engine import Engine
@@ -74,13 +76,17 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--no-browser", action="store_true")
 
     sub.add_parser("rule", help="print the ranking rule and exit")
+    sub.add_parser("config", help="show which keys are wired up, and where they came from")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    config.load_env()  # a real environment variable always beats the file
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "config":
+        return _print_config()
     if args.command == "rule":
         return _print_rule()
     if args.command == "demo":
@@ -105,6 +111,31 @@ def _print_rule() -> int:
     for gate in GATE_RULES:
         print(f"    · {gate}")
     print()
+    return EXIT_OK
+
+
+def _print_config() -> int:
+    present = config.DEFAULT_ENV_FILE.is_file()
+    print(f"\n  config file: {config.DEFAULT_ENV_FILE}"
+          f"{'' if present else '  (not created — cp .env.example .env)'}\n")
+    for key, status, note in config.describe():
+        mark = " " if status == "not set" else "+"
+        print(f"   {mark} {key:<18} {status:<22} {note}")
+
+    kimi = os.environ.get("KIMI_API_KEY") or os.environ.get("MOONSHOT_API_KEY")
+    try:
+        import daytona  # noqa: F401
+        sdk = "installed"
+    except ImportError:
+        sdk = "not installed (pip install daytona)"
+
+    print(f"\n  daytona SDK: {sdk}")
+    print("\n  what will run right now:")
+    print(f"   · machines        local copy-on-write forks"
+          f"{' | daytona available' if os.environ.get('DAYTONA_API_KEY') and sdk == 'installed' else ''}")
+    print(f"   · test suite      {'kimi' if kimi else 'offline generator (no key set)'}")
+    print(f"   · closing verdict {'kimi' if kimi else 'template (no key set)'}")
+    print("\n  none of this is required — `audition demo` works with an empty config.\n")
     return EXIT_OK
 
 

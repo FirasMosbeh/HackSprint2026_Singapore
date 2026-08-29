@@ -179,14 +179,45 @@ database/runs/          cached runs, replayable with `audition demo`
 
 ## Configuration
 
-| Variable | Purpose |
-| -------- | ------- |
-| `KIMI_API_KEY` / `MOONSHOT_API_KEY` | enables Kimi test generation and the closing sentence |
-| `KIMI_MODEL`, `KIMI_BASE_URL` | override the model (default `kimi-k2-turbo-preview`) |
-| `DAYTONA_API_KEY` | required for `--provider daytona` |
+**Nothing is required.** With no configuration at all, Audition runs end to
+end: local copy-on-write forks, the offline conformance-test generator, and a
+template verdict. Keys only add the Kimi and Daytona tiers on top.
 
-Without any of these, Audition runs end to end on a deterministic offline test
-generator and a template verdict.
+```bash
+cp .env.example .env     # then fill in whatever you actually have
+./audition config        # shows what is wired up and what will run
+```
+
+`.env` lives at the repo root and is gitignored. A real environment variable
+always beats the file, so you can override any line for a single run:
+
+```bash
+KIMI_MODEL=kimi-k2-0905-preview ./audition run ...
+```
+
+| Variable | Needed for | Where to get it |
+| -------- | ---------- | --------------- |
+| `KIMI_API_KEY` | Kimi writes the conformance suite and the closing sentence | [platform.moonshot.ai](https://platform.moonshot.ai/console/api-keys) |
+| `KIMI_MODEL`, `KIMI_BASE_URL` | overriding the model or the endpoint | optional; defaults to `kimi-k2-turbo-preview` |
+| `DAYTONA_API_KEY` | `--provider daytona` | [app.daytona.io](https://app.daytona.io) → Dashboard → Keys |
+| `DAYTONA_TARGET`, `DAYTONA_API_URL` | non-default region or control plane | optional; only if your dashboard shows one |
+
+### Running against Daytona
+
+```bash
+pip install daytona          # the SDK is an optional extra, not a dependency
+echo "DAYTONA_API_KEY=dtn_..." >> .env
+./audition config            # confirm: "daytona available"
+./audition run "..." --candidates dateparser,arrow --provider daytona
+```
+
+The Daytona provider implements the same two operations as the local one
+(`prepare_base` and `fork`), so nothing above it changes. Its SDK calls are
+capability-probed rather than assumed, because the SDK surface has moved
+between versions — if your version exposes neither `sandbox.fork()` nor
+snapshot creation, it says so and names the method it wanted. **This path has
+not been exercised against a live API key**; the local provider is the default
+and is what the demo depends on.
 
 ## Roadmap
 
