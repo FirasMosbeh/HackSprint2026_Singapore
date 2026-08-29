@@ -10,3 +10,12 @@ dist/
 
 # secrets
 .env
+
+.env.example
+
+.gitignore
+daytona/
+.venv/
+o
+out
+test/
